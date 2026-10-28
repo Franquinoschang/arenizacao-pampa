@@ -1,0 +1,19 @@
+[project]
+name = "arenizacao-pampa"
+version = "0.1.0"
+description = "Mapeamento de areais na ottobacia Miracatu-Taquari (RS) com Sentinel-2 e Random Forest – capstone FTL Space Tech Bootcamp 2026"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "earthengine-api>=1.0",
+    "geemap>=0.35",
+    "geopandas>=1.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "ipykernel>=6.29",
+]
+
+[tool.uv]
+package = false
