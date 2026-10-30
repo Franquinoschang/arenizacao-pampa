@@ -10,7 +10,7 @@ __pycache__/
 .env
 
 # Saídas grandes (ficam no Google Drive / Zenodo)
-data/processed/*.tif
+data/processed/**/*.tif
 *.aux.xml
 
 # Sistema
