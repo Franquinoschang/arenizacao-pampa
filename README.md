@@ -1,34 +1,39 @@
-# Arenização no Pampa: mapeamento de areais com Sentinel-2 e Random Forest
+# Mapeamento de áreas de arenização com Sentinel-2 e Random Forest
 
-> Projeto final (capstone) do **Future Tech Leaders Brasil – Space Tech Bootcamp 2026**
+> Projeto final do **Future Tech Leaders Brasil – Space Tech Bootcamp 2026**
 
 **Autora:** Franqueline Monback Noschang – franqueline.noschang@gmail.com
-**Mapa interativo:** _em construção (GitHub Pages)_
-**Dataset de amostras:** _em construção (Zenodo)_
+**Mapa interativo:** https://franquinoschang.github.io/arenizacao-pampa/ _(publicado após a primeira execução completa do notebook)_
 
 ![Localização da ottobacia](figures/localizacao_bacia.png)
 
-## 1. Objetivo
+## 1. Ideia do projeto
 
-Mapear as **áreas de arenização (areais) existentes em 2025** na ottobacia **Miracatu-Taquari** (código 682636, nível 6, 588 km²), entre Manoel Viana e São Francisco de Assis, sudoeste do Rio Grande do Sul. O mapeamento usa imagens Sentinel-2 e classificação supervisionada com Random Forest.
+Mapear as **áreas de arenização (areais) existentes em 2025** na ottobacia **Miracatu-Taquari** (código 682636, entre Manoel Viana e São Francisco de Assis, sudoeste do RS), com imagens **Sentinel-2** e **Random Forest**.
 
-Perguntas do projeto:
+**Problema.** A arenização é o principal processo de degradação do solo no Pampa gaúcho: em substratos arenosos frágeis, a perda da vegetação forma manchas de areia exposta. Os mapeamentos existentes usam imagens de 30 m ou classes genéricas de "área não vegetada", sem separar o areal de outros solos expostos, sobretudo da lavoura em preparo de solo, que tem resposta espectral parecida numa única data.
 
-1. Onde estão e quanto ocupam os areais da ottobacia em 2025?
-2. Variáveis temporais dentro do ano (frequência de solo exposto, NDVI de verão e de inverno) separam o areal da lavoura em preparo de solo?
-3. Qual modelo de machine learning tem o melhor desempenho nessa tarefa, avaliado com validação cruzada espacial?
+**Objetivo e produto final.** Inventário atualizado e aberto dos areais da ottobacia, em 10 m e com acurácia avaliada:
 
-O inventário de areais produzido aqui serve de base de validação para um mapa de suscetibilidade à arenização por análise multicritério (AHP), em desenvolvimento numa dissertação de mestrado.
+- mapa de classificação de 2025 (GeoTIFF);
+- polígonos de areais (shapefile);
+- código aberto neste repositório;
+- mapa web no GitHub Pages.
 
-## 2. Relevância
+## 2. Relevância para os ODS e para o ecossistema espacial
 
-A arenização é o principal processo de degradação do solo no Pampa gaúcho: sobre arenitos friáveis (formações Botucatu e Guará), a perda da cobertura vegetal remobiliza a areia e forma manchas que dificultam a recolonização do campo.
+- **ODS 15 – Vida Terrestre**, meta 15.3 (combater a degradação do solo): saber onde estão os areais é o primeiro passo para priorizar manejo e recuperação.
+- **ODS 2 – Fome Zero e Agricultura Sustentável:** a arenização reduz a área útil para pecuária e lavoura; o mapa orienta o manejo do solo.
+- **ODS 13 – Ação Climática:** os areais respondem a chuvas intensas e ao vento; o inventário é a linha de base para monitorar esses efeitos.
 
-- **ODS 15 – Vida Terrestre**, meta 15.3 (combater a degradação e restaurar solos degradados)
-- **ODS 2 – Fome Zero e Agricultura Sustentável** (manejo do solo em áreas produtivas)
-- **ODS 13 – Ação Climática** (linha de base para monitorar processos sensíveis a chuva e vento)
+**Contribuição prática.** O inventário será a base de validação de um mapa de suscetibilidade à arenização por AHP, desenvolvido em dissertação de mestrado, e oferece ao ecossistema geoespacial um fluxo aberto e reprodutível para mapear areais com Sentinel-2.
 
-## 3. Área de estudo
+## 3. Literatura de referência
+
+- **Souza e Pires (2017)** mapearam os areais do Arroio Puitã (1984–2014) com Landsat e Máxima Verossimilhança, escolhida entre cinco classificadores, e relatam confusão entre areal com vegetação rala e solo de cultivo por usarem uma imagem por ano. É a referência regional e mostra a lacuna abordada: data única e 30 m.
+- **Rayne et al. (2023)** detectaram campos desertificados em Marrocos com Sentinel-2, Google Earth Engine e Random Forest, com 74–76% de acurácia na classe de desertificação. É a referência metodológica e o parâmetro realista de acurácia.
+
+## 4. Área de estudo
 
 | Item | Valor |
 |---|---|
@@ -36,70 +41,104 @@ A arenização é o principal processo de degradação do solo no Pampa gaúcho:
 | Código / nível (ANA) | 682636 / 6 |
 | Área | 588 km² |
 | Municípios | Manoel Viana e São Francisco de Assis – RS |
-| Suprabacia | Ibicuí–Santa Maria (Bacia do Rio Uruguai) |
 | Bioma | Pampa |
 | Sistema de referência do limite | SIRGAS 2000 (EPSG:4674) |
 | Sistema das saídas | SIRGAS 2000 / UTM 21S (EPSG:31981) |
 
-## 4. Dados
+## 5. Dados
+
+Todos os dados são públicos, acessados pelo Google Earth Engine (GEE) ou por download direto.
 
 | Dado | Fonte | Formato | Uso |
 |---|---|---|---|
-| Sentinel-2 L2A, todas as cenas de 2025 (`COPERNICUS/S2_SR_HARMONIZED`) | ESA, via Google Earth Engine | Raster, 10–20 m | Índices e variáveis do modelo |
-| Cloud Score+ (`GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED`) | Google Earth Engine | Raster | Máscara de nuvens |
-| Limite da ottobacia (`data/raw/area_de_estudo.shp`) | ANA – Base Hidrográfica Ottocodificada | Shapefile | Recorte da área de estudo |
-| Amostras rotuladas (`data/samples/`) | Produzidas neste projeto | GeoPackage | Treino e validação |
+| Sentinel-2 L2A, reflectância de superfície (`COPERNICUS/S2_SR_HARMONIZED`) | ESA/Copernicus, via GEE | Raster, 10–60 m conforme a banda | Índices espectrais e variáveis do modelo |
+| Cloud Score+ (`GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED`) | Google, via GEE | Raster | Máscara de nuvens |
+| Limite da ottobacia 682636 (`data/raw/area_de_estudo.shp`) | ANA – Base Hidrográfica Ottocodificada | Shapefile | Recorte da área de estudo |
+| MapBiomas Pampa 10 m (Coleção 4) | MapBiomas | Raster | Apoio à amostragem e comparação |
+| Amostras rotuladas (`data/samples/amostras_2025.geojson`) | Produzidas neste projeto | GeoJSON | Treino e validação |
 
-Todos os dados de entrada são públicos.
+### Dataset de amostras
 
-## 5. Metodologia
+`data/samples/amostras_2025.geojson` contém polígonos rotulados por **interpretação visual no QGIS** sobre imagens de alta resolução, com apoio da mediana Sentinel-2 e do MapBiomas 10 m. Meta: **100 a 200 amostras por classe**.
+
+| Campo | Tipo | Conteúdo |
+|---|---|---|
+| `classe` | inteiro | 1 Areal · 2 Campo · 3 Lavoura · 4 Silvicultura · 5 Água |
+| `poligono` | inteiro | identificador único do polígono (usado para separar treino e teste) |
+
+O notebook sorteia pontos dentro de cada polígono e lê neles o valor das variáveis. A tabela resultante fica em `data/processed/amostras_variaveis_2025.csv`.
+
+## 6. Metodologia – Machine Learning (Random Forest)
+
+**Ferramentas:** Python no VS Code, com `earthengine-api`, `geemap` e `scikit-learn`.
 
 ```
-Limite da ottobacia ─► Sentinel-2 2025 (todas as cenas + máscara de nuvens)
+Limite da ottobacia ─► Sentinel-2 L2A 2025 (todas as cenas + máscara de nuvens)
                               │
                               ▼
-                 Índices por cena: NDVI, NDWI, BSI
+                 Índices por cena: NDVI, BSI, NDWI
                               │
                               ▼
-   Variáveis anuais por pixel: medianas das bandas, NDVI p10/p50/p90,
-   NDVI de verão e de inverno, frequência de solo exposto
+   Resumo anual por pixel: mediana das bandas, NDVI mínimo,
+   NDVI médio e frequência de solo exposto
                               │
-   Polígonos de amostra ──► pontos ──► comparação de modelos (CV espacial)
-                                              │
-                                              ▼
-                       Random Forest no Earth Engine ──► mapa de 2025
-                                              │
-                                              ▼
-                 Área por classe + GeoTIFF e shapefile para o QGIS
+   Amostras (GeoJSON) ──► 70% treino ──► Random Forest + ajuste de
+                     │                    hiperparâmetros (validação cruzada)
+                     └──► 30% teste  ──► matriz de confusão, acurácia, precisão,
+                                          recall, F1 e importância por classe
+                              │
+                              ▼
+   Mapa de 2025 (GEE) ─► polígonos de areais ─► GeoTIFF, shapefile e mapa web
 ```
+
+**Pré-processamento.** Filtrar as cenas Sentinel-2 de 2025, mascarar nuvens com o Cloud Score+ e calcular por cena:
+
+- **NDVI** (vegetação) = (NIR − Vermelho) / (NIR + Vermelho)
+- **BSI** (solo exposto) = ((SWIR1 + Vermelho) − (NIR + Azul)) / ((SWIR1 + Vermelho) + (NIR + Azul))
+- **NDWI** (água) = (Verde − NIR) / (Verde + NIR)
+
+**Variáveis do modelo** (resumo do ano por pixel):
+
+| Variável | Descrição |
+|---|---|
+| `B2_med` … `B12_med` | mediana anual das bandas azul, verde, vermelho, NIR, SWIR1 e SWIR2 |
+| `NDVI_min` | NDVI mínimo do ano |
+| `NDVI_medio` | NDVI médio do ano |
+| `FREQ_EXPOSTO` | fração das cenas com solo exposto (NDVI < 0,25 e BSI > 0) |
+
+A **frequência de solo exposto** é a variável que separa areal de lavoura: o areal fica exposto o ano todo; a lavoura, só no preparo do solo.
 
 **Classes:** 1 Areal · 2 Campo · 3 Lavoura · 4 Silvicultura · 5 Água
 
-**Variável-chave:** a frequência de solo exposto ao longo do ano. O areal fica exposto o ano todo; a lavoura, só no preparo do solo.
+**Etapas:**
 
-**Validação:** treino e teste são separados **por polígono** (`StratifiedGroupKFold`), para evitar acurácia inflada por pixels vizinhos. Métrica principal: F1 macro. Também são reportados matriz de confusão, F1 por classe e importância das variáveis por permutação.
+1. **Treino:** Random Forest em **70% das amostras**, com ajuste de hiperparâmetros (**nº de árvores**, **profundidade** e **variáveis por divisão**) por validação cruzada de 5 dobras.
+2. **Avaliação:** nos **30% restantes**, com matriz de confusão, acurácia global, precisão, recall, F1 e importância das variáveis por classe (por permutação).
+3. **Produtos:** classificação da ottobacia no GEE (`smileRandomForest`), área por classe, comparação com o MapBiomas 10 m, exportação do mapa e dos polígonos de areais e geração do mapa web.
 
-**Modelos comparados:** baseline Dummy, regressão logística, KNN, SVM, Gradient Boosting e Random Forest, seguindo a estrutura da aula *Machine Learning I* do [ebook do bootcamp](https://ftl-brazil-2026.github.io/ebook/).
+Treino e teste são separados **por polígono** (`StratifiedGroupKFold`), mantendo a proporção das classes, para que pixels vizinhos de um mesmo polígono não fiquem dos dois lados e inflem a acurácia.
 
-## 6. Estrutura do repositório
+**Por que Random Forest.** É uma classificação de pixels com poucas amostras rotuladas (centenas) e variáveis tabulares: o Random Forest funciona bem nesse cenário, é robusto a variáveis correlacionadas, mostra quais variáveis importam e roda nativamente no GEE. Deep Learning exigiria um grande volume de imagens rotuladas, que não existe para areais, e seu ganho principal (forma e textura) pesa pouco, pois o areal se distingue mais pelo comportamento ao longo do ano do que pela forma.
+
+## 7. Estrutura do repositório
 
 ```
 arenizacao-pampa/
 ├── data/
-│   ├── raw/          # limite da ottobacia (shapefile)
-│   ├── samples/      # amostras rotuladas (GeoPackage)
-│   └── processed/    # tabelas geradas pelos notebooks
+│   ├── raw/          # limite da ottobacia (shapefile, ANA)
+│   ├── samples/      # amostras rotuladas (GeoJSON)
+│   └── processed/    # tabelas geradas pelo notebook
 ├── notebooks/
 │   └── 01_pipeline_arenizacao.ipynb
 ├── figures/          # mapas e gráficos
-├── docs/             # página do GitHub Pages
+├── docs/             # mapa web (GitHub Pages)
 ├── src/              # funções reutilizáveis
 ├── pyproject.toml    # ambiente uv
 ├── requirements.txt  # alternativa ao uv
 └── README.md
 ```
 
-## 7. Instalação
+## 8. Instalação
 
 Requisitos: Git, [uv](https://docs.astral.sh/uv/), VS Code com as extensões Python e Jupyter, e uma conta no [Google Earth Engine](https://earthengine.google.com/) vinculada a um projeto do Google Cloud (uso não comercial gratuito).
 
@@ -119,40 +158,42 @@ uv run earthengine authenticate
 
 Depois, no notebook, troque `SEU-PROJETO-GCP` pelo ID do seu projeto do Google Cloud.
 
-## 8. Como executar
+## 9. Como executar
 
 1. Abra a pasta no VS Code e selecione o kernel do `.venv`.
 2. Abra `notebooks/01_pipeline_arenizacao.ipynb`.
 3. As etapas 1 a 4 rodam sem amostras e mostram o mapa da frequência de solo exposto.
-4. As etapas 5 a 9 precisam de `data/samples/amostras_2025.gpkg` (polígonos com os campos `classe` e `poligono`).
+4. As etapas 5 a 10 precisam de `data/samples/amostras_2025.geojson`.
+5. Para comparar com o MapBiomas 10 m, preencha `ASSET_MAPBIOMAS_10M` na célula de parâmetros com o ID do asset publicado pelo MapBiomas.
+6. A etapa 10 gera `docs/index.html`; depois do `git push`, o mapa aparece no GitHub Pages.
 
 Todas as etapas aleatórias usam `SEMENTE = 42`.
 
-## 9. Resultados
+## 10. Resultados
 
-_A preencher: mapa de classificação, comparação de modelos, matriz de confusão, importância das variáveis e área de areal na ottobacia._
+_A preencher após a execução: mapa de classificação, matriz de confusão, acurácia global, precisão, recall e F1 por classe, importância das variáveis por classe, área de areal na ottobacia e comparação com o MapBiomas 10 m._
 
-## 10. Limitações
+## 11. Limitações e trabalhos futuros
 
 - A resolução de 10–20 m não captura areais muito pequenos ou estreitos.
 - Areais sob plantios de silvicultura não aparecem na imagem.
 - As amostras vêm de interpretação visual, sem verificação de campo.
-- O mapa cobre um único ano (2025); a expansão ao longo do tempo fica como trabalho futuro.
+- O NDVI mínimo é sensível a nuvens residuais não removidas pela máscara.
+- O mapa cobre um único ano (2025). Aplicar o modelo a anos anteriores, para medir a expansão dos areais, fica como extensão futura.
 
-## 11. Referências
+## 12. Referências
 
-- DE NARDIN, D.; ROBAINA, L. E. S. Zoneamento geoambiental no oeste do Rio Grande do Sul: bacia hidrográfica do Arroio Miracatu. *Geografia*, Rio Claro, v. 34, n. 1, p. 163–181, 2009.
-- DUMMER, J.; VERDUM, R. Controle estrutural nos processos erosivos hídricos e na arenização, bacia hidrográfica do Arroio Miracatu – Rio Grande do Sul. *Revista Brasileira de Geomorfologia*, v. 24, 2023. DOI: 10.20502/rbg.v24i00.2318.
+- MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Código: github.com/mapbiomas/brazil-pampa. Disponível em: brasil.mapbiomas.org.
+- RAYNE, L.; BRANDOLINI, F.; MAKOVICS, J. L. et al. Detecting desertification in the ancient oases of southern Morocco. *Scientific Reports*, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.
 - SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. *Revista Brasileira de Geomorfologia*, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.
-- RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. *Scientific Reports*, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.
-- MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Código: github.com/mapbiomas/brazil-pampa.
-- BREIMAN, L. Random Forests. *Machine Learning*, v. 45, p. 5–32, 2001.
-- GORELICK, N. et al. Google Earth Engine: planetary-scale geospatial analysis for everyone. *Remote Sensing of Environment*, v. 202, p. 18–27, 2017.
 
-## 12. Licença
+## 13. Licença
 
 Código sob licença **MIT**. Dados produzidos neste projeto sob **CC BY 4.0**. Dados de terceiros seguem as licenças das respectivas fontes.
 
-## 13. Agradecimentos
+## 14. Agradecimentos
 
 Future Tech Leaders Brasil, Agência Espacial Brasileira (AEB), SDG AI Lab, UNDP / ICPSD.
+Emanuel, professor ao longo do curso.
+Marco Antônio da Rosa Soares, amigo e apoiador do projeto.
+Professor orientador Romário Trentin.
