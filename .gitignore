@@ -13,6 +13,14 @@ __pycache__/
 data/processed/**/*.tif
 *.aux.xml
 
+# Arquivos auxiliares do ArcGIS / QGIS
+*.ovr
+*.vat.cpg
+*.vat.dbf
+*.lock
+*.sbn
+*.sbx
+
 # Sistema
 .DS_Store
 Thumbs.db

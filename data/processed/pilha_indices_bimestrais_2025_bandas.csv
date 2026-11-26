@@ -1,0 +1,20 @@
+banda,nome,descricao,fator_escala
+1,NDVI_1_jan_fev,"NDVI mediano (vegetacao), jan-fev 2025",10000
+2,NDWI_1_jan_fev,"NDWI mediano (agua), jan-fev 2025",10000
+3,BSI_1_jan_fev,"BSI mediano (solo exposto), jan-fev 2025",10000
+4,NDVI_2_mar_abr,"NDVI mediano (vegetacao), mar-abr 2025",10000
+5,NDWI_2_mar_abr,"NDWI mediano (agua), mar-abr 2025",10000
+6,BSI_2_mar_abr,"BSI mediano (solo exposto), mar-abr 2025",10000
+7,NDVI_3_mai_jun,"NDVI mediano (vegetacao), mai-jun 2025",10000
+8,NDWI_3_mai_jun,"NDWI mediano (agua), mai-jun 2025",10000
+9,BSI_3_mai_jun,"BSI mediano (solo exposto), mai-jun 2025",10000
+10,NDVI_4_jul_ago,"NDVI mediano (vegetacao), jul-ago 2025",10000
+11,NDWI_4_jul_ago,"NDWI mediano (agua), jul-ago 2025",10000
+12,BSI_4_jul_ago,"BSI mediano (solo exposto), jul-ago 2025",10000
+13,NDVI_5_set_out,"NDVI mediano (vegetacao), set-out 2025",10000
+14,NDWI_5_set_out,"NDWI mediano (agua), set-out 2025",10000
+15,BSI_5_set_out,"BSI mediano (solo exposto), set-out 2025",10000
+16,NDVI_6_nov_dez,"NDVI mediano (vegetacao), nov-dez 2025",10000
+17,NDWI_6_nov_dez,"NDWI mediano (agua), nov-dez 2025",10000
+18,BSI_6_nov_dez,"BSI mediano (solo exposto), nov-dez 2025",10000
+19,FREQ_EXPOSTO,"fracao das cenas de 2025 com solo exposto (NDVI<0,25 e BSI>0)",10000
