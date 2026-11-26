@@ -51,11 +51,12 @@ def _metricas(arquivo):
     if not arquivo.exists():
         return None
     df = pd.read_csv(arquivo, index_col=0)
-    linhas = [{"classe": c, "precisao": round(df.loc[c, "precision"], 3), "recall": round(df.loc[c, "recall"], 3),
-               "f1": round(df.loc[c, "f1-score"], 3), "n": int(df.loc[c, "support"])}
+    # Valores com precisão total: o arredondamento para exibição é feito uma vez só, na página
+    linhas = [{"classe": c, "precisao": round(df.loc[c, "precision"], 6), "recall": round(df.loc[c, "recall"], 6),
+               "f1": round(df.loc[c, "f1-score"], 6), "n": int(df.loc[c, "support"])}
               for c in df.index if c not in ("accuracy", "macro avg", "weighted avg")]
-    return {"linhas": linhas, "acuracia": round(df.loc["accuracy", "f1-score"], 3),
-            "f1_macro": round(df.loc["macro avg", "f1-score"], 3)}
+    return {"linhas": linhas, "acuracia": round(df.loc["accuracy", "f1-score"], 6),
+            "f1_macro": round(df.loc["macro avg", "f1-score"], 6)}
 
 
 def _barras_area(areas):
@@ -108,7 +109,7 @@ def _matriz_mapbiomas(tabela):
 
 
 def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbiomas, limites, areais_geojson,
-                 bacia_geojson, tem_mb, periodos_s2=(), areal_por_mb=None, logos=(), repo_url="",
+                 bacia_geojson, tem_mb, periodos_s2=(), areal_por_mb=None, n_cenas=None, logos=(), repo_url="",
                  site_url="https://franquinoschang.github.io/arenizacao-pampa/"):
     """Gera pasta_web/index.html.
 
@@ -143,7 +144,7 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
             continue
         assinatura["classes"].append({"nome": nomes_treino[c], "cor": cores_treino[c]})
         for v in VARIAVEIS_ASSINATURA:
-            q = sub[v].quantile([0.25, 0.5, 0.75]).round(3).tolist()
+            q = sub[v].quantile([0.25, 0.5, 0.75]).round(6).tolist()
             assinatura["valores"].setdefault(v, []).append(q)
 
     ajuste = pd.read_csv(proc / "ajuste_hiperparametros_rf.csv").sort_values("mean_test_score", ascending=False)
@@ -153,7 +154,7 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
     importancia = pd.read_csv(proc / f"importancia_por_classe_{ano}.csv", index_col=0)
     dados_importancia = {"variaveis": importancia.index.tolist(),
                          "classes": importancia.columns.tolist(),
-                         "valores": {c: importancia[c].round(4).tolist() for c in importancia.columns}}
+                         "valores": {c: importancia[c].round(6).tolist() for c in importancia.columns}}
 
     qc = pd.read_csv(proc / f"qc_areais_{ano}.csv")
     qc_resumo = qc.groupby("status").agg(n=("poligono", "size"), ha=("area_ha", "sum"))
@@ -194,11 +195,19 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
     figura_local = Path(pasta_figuras) / "localizacao_bacia.png"
     if figura_local.exists():
         shutil.copy(figura_local, web / "localizacao_bacia.png")
+    figura_matriz = Path(pasta_figuras) / "matriz_confusao.png"
+    if figura_matriz.exists():
+        shutil.copy(figura_matriz, web / "matriz_confusao.png")
 
     # --- Trechos de HTML ---------------------------------------------------------------------------------
     legenda = "".join(
-        f'<li><span class="cor" style="background:{CORES_WEB[c]}"></span>{CLASSES_MAPA[c]}'
+        f'<li class="item-classe" tabindex="0" data-classe="{c}" data-cor="{CORES_WEB[c]}">'
+        f'<span class="cor" style="background:{CORES_WEB[c]}"></span>{CLASSES_MAPA[c]}'
         f'<span class="km">{br(areas.get(c, 0.0))} km²</span></li>' for c in [1, 2, 3, 4, 5, 6])
+
+    # Polígonos em arquivos separados, carregados pela página com fetch()
+    (web / f"areais_{ano}.geojson").write_text(areais_geojson, encoding="utf-8")
+    (web / "bacia.geojson").write_text(bacia_geojson, encoding="utf-8")
     logos_html = "".join(f'<img src="{a}" alt="{html.escape(alt)}">' for a, alt in logos)
 
     if areal_por_mb:
@@ -236,7 +245,8 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
         "__ANO_MB__": str(ano_mapbiomas) if tem_mb else "",
         "__ANO__": str(ano), "__SUL__": f"{sul:.6f}", "__NORTE__": f"{norte:.6f}",
         "__OESTE__": f"{oeste:.6f}", "__LESTE__": f"{leste:.6f}",
-        "__AREAIS__": areais_geojson, "__BACIA__": bacia_geojson,
+        "__V_AREA__": f"{area_areal:.2f}", "__V_PCT__": f"{100 * area_areal / area_total:.1f}",
+        "__V_F1__": f"{f1_areal:.2f}", "__V_ACURACIA__": f"{principal['acuracia']:.2f}",
         "__AREA__": br(area_areal), "__PCT__": br(100 * area_areal / area_total, 1), "__F1__": br(f1_areal),
         "__ACURACIA__": br(principal["acuracia"]), "__F1_MACRO__": br(principal["f1_macro"]),
         "__ORIGEM_METRICAS__": "do mapa do Earth Engine" if metricas["ee"] else "do modelo (scikit-learn)",
@@ -261,6 +271,12 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
                                + ('<option value="mapbiomas">MapBiomas 10 m</option>' if tem_mb else "")
                                + '<option value="fundo">Só a imagem de fundo</option>',
         "__REPO__": repo_url, "__SITE__": site_url,
+        "__SERIE__": f"série de {ano} inteira" + (f" ({n_cenas} cenas)" if n_cenas else ""),
+        "__FIGURA_MATRIZ__": ('<figure class="figura-matriz"><img src="matriz_confusao.png" alt="Matriz de confusão nos pontos de teste, com '
+                              'as classes de referência nas linhas e as classes previstas nas colunas"><figcaption>'
+                              'Matriz de confusão do modelo (scikit-learn) nos pontos de teste, com as sete classes do '
+                              'treino: linhas são a classe de referência e colunas, a classe prevista. A Lavoura exposta é '
+                              'juntada à Lavoura no mapa final.</figcaption></figure>' if figura_matriz.exists() else ""),
         "__FIGURA_LOCAL__": ('<figure><img src="localizacao_bacia.png" alt="Mapa de localização da ottobacia '
                              'Miracatu-Taquari no Rio Grande do Sul"><figcaption>Localização da ottobacia '
                              'Miracatu-Taquari (código 682636).</figcaption></figure>'
@@ -356,10 +372,49 @@ MODELO = r"""<!doctype html>
   .legenda { left: 16px; bottom: 24px; max-width: 280px; }
   .legenda summary { font: 600 16px var(--titulo); cursor: pointer; padding: 4px 0; }
   .legenda ul { list-style: none; margin: 4px 0 8px; padding: 0; }
-  .legenda li { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+  .legenda li { display: flex; align-items: center; gap: 8px; padding: 2px 4px; margin: 0 -4px; border-radius: 6px;
+                transition: opacity 200ms var(--curva), background 200ms var(--curva); }
+  .item-classe { cursor: pointer; }
+  .item-classe:focus-visible { outline: 2px solid var(--roxo); outline-offset: 0; }
+  .legenda ul.destacando .item-classe { opacity: 0.4; }
+  .legenda ul.destacando .item-classe.ativo { opacity: 1; background: color-mix(in srgb, var(--roxo) 14%, transparent); }
+  .imagem-s2 { transition: opacity 400ms var(--curva); }
+  .cartao .explica { display: block; max-width: 220px; margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--texto-suave); }
+  .quadro { font-size: 14px; min-width: 620px; }
+  .quadro th[scope=row] { font-weight: 600; white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--fundo); }
+  .figura-matriz img { display: block; max-width: 620px; margin: 0 auto; background: #fff; }
+  .quadro th.projeto { background: var(--roxo); color: #fff; border-radius: 8px 8px 0 0; }
+  .quadro td.projeto { background: color-mix(in srgb, var(--roxo) 12%, transparent); font-weight: 500; }
+  .trabalhos { display: grid; gap: 8px; margin-top: 16px; }
+  .trabalhos summary { font: 600 16px var(--titulo); cursor: pointer; }
+  .trabalhos p { margin: 8px 0 0; font-size: 15px; }
+  .cita { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+  .balao { position: absolute; z-index: 3000; max-width: min(340px, calc(100vw - 16px)); background: var(--superficie);
+           color: var(--texto); border-radius: 14px; box-shadow: 0 4px 18px rgba(30, 27, 46, 0.22); padding: 12px 16px;
+           font-size: 13px; line-height: 1.45; opacity: 0; transform: translateY(4px);
+           transition: opacity 150ms var(--curva), transform 150ms var(--curva); }
+  .balao.visivel { opacity: 1; transform: none; }
+  .balao .botao-doi { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; background: var(--roxo);
+                      color: #fff; text-decoration: none; font-weight: 500; }
+  .linha-tempo { display: flex; flex-direction: column; gap: 4px; }
+  .tempo { display: flex; align-items: center; gap: 8px; }
+  .controles .tempo input[type=range] { flex: 1; width: auto; min-width: 0; }
+  .botao-play { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: none;
+                border-radius: 999px; background: var(--roxo); color: #fff; cursor: pointer;
+                transition: transform 200ms var(--curva); }
+  .botao-play:hover { transform: scale(1.06); }
+  .botao-play svg { width: 14px; height: 14px; fill: currentColor; }
+  .botao-play .icone-pausa, .botao-play[aria-pressed=true] .icone-play { display: none; }
+  .botao-play[aria-pressed=true] .icone-pausa { display: inline; }
+  @media (prefers-reduced-motion: reduce) {
+    .imagem-s2, .legenda li, .botao-play, .barra, .bigode, .menu a, .botao, .balao { transition: none; }
+    html { scroll-behavior: auto; }
+  }
   .cor { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(0, 0, 0, 0.2); }
   .legenda .km { margin-left: auto; padding-left: 16px; color: var(--texto-suave); }
-  .controles { left: 16px; top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .controles { left: 16px; top: 16px; }
+  .controles summary { font: 600 14px var(--titulo); cursor: pointer; padding: 4px 0; }
+  .conteudo-controles { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
   .controles label { display: flex; flex-direction: column; gap: 4px; }
   .controles input[type=range] { accent-color: var(--roxo); width: 220px; }
   .controles .seletor { width: 220px; font-size: 13px; }
@@ -471,20 +526,31 @@ __VENTO__
 
 <section id="mapa-secao" aria-label="Mapa e números principais">
   <div class="numeros">
-    <div class="cartao"><b>__AREA__</b><span>km² de areal</span></div>
-    <div class="cartao"><b>__PCT__%</b><span>da bacia (__AREA_TOTAL__ km²)</span></div>
-    <div class="cartao"><b>__F1__</b><span>F1 do Areal no teste</span></div>
-    <div class="cartao"><b>__ACURACIA__</b><span>acurácia global no teste</span></div>
+    <div class="cartao"><b data-valor="__V_AREA__" data-casas="2">__AREA__</b><span>km² de areal</span></div>
+    <div class="cartao"><b data-valor="__V_PCT__" data-casas="1" data-sufixo="%">__PCT__%</b><span>da bacia (__AREA_TOTAL__ km²)</span></div>
+    <div class="cartao"><b data-valor="__V_F1__" data-casas="2">__F1__</b><span>F1 do Areal no teste</span>
+      <small class="explica">F1: equilíbrio entre encontrar os areais e não marcar areal onde não existe (de 0 a 1).</small></div>
+    <div class="cartao"><b data-valor="__V_ACURACIA__" data-casas="2">__ACURACIA__</b><span>acurácia global no teste</span></div>
   </div>
   <div class="area-mapa">
     <div id="mapa" aria-label="Mapa da classificação de cobertura da terra"></div>
-    <div class="painel controles">
+    <details class="painel controles" id="controles" open>
+      <summary>Camadas e linha do tempo</summary>
+      <div class="conteudo-controles">
       <label>Fundo<select class="seletor" id="fundo">__OPCOES_FUNDO__</select></label>
-      <label id="ctrl-periodo" hidden>Período da imagem: <b id="rotulo-periodo"></b>
-        <input type="range" id="periodo" min="0" max="0" value="0" aria-label="Período da imagem Sentinel-2"></label>
+      <div id="ctrl-periodo" class="linha-tempo" hidden>
+        <span>Período: <b id="rotulo-periodo" aria-live="polite"></b></span>
+        <div class="tempo">
+          <button type="button" class="botao-play" id="play" aria-pressed="false" aria-label="Reproduzir a linha do tempo">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path class="icone-play" d="M4 2.5v11l9-5.5z"/><path class="icone-pausa" d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
+          </button>
+          <input type="range" id="periodo" min="0" max="0" value="0" aria-label="Período da imagem Sentinel-2">
+        </div>
+      </div>
       <label>Opacidade das classes<input type="range" id="opacidade" min="0" max="100" value="75"></label>
       <label>Comparar lado a lado com<select class="seletor" id="comparar-com">__OPCOES_COMPARAR__</select></label>
-    </div>
+      </div>
+    </details>
     <input type="range" class="divisor" id="divisor" min="0" max="100" value="50" aria-label="Divisão entre os mapas" hidden>
     <div class="linha" id="linha" hidden></div>
     <span class="lado" id="lado-esq" style="left: 16px" hidden>Este mapa</span>
@@ -524,7 +590,61 @@ __VENTO__
       reprodutível e este mapa web.</p>
     </div>
   </div>
+  <p>O inventário será a base de validação de um mapa de suscetibilidade à arenização por Análise Hierárquica de
+  Processos (AHP), em desenvolvimento no mestrado em Geografia da UFSM.</p>
   __FIGURA_LOCAL__
+
+  <h3>Trabalhos relacionados</h3>
+  <p><a class="cita" href="#ref-suertegaray1992">Suertegaray (1992)</a> propôs o termo <b>arenização</b> para os areais do
+  sudoeste gaúcho: em clima úmido, a degradação não é desertificação, e sim o retrabalhamento de depósitos arenosos pouco
+  consolidados, em que a areia em movimento dificulta a fixação da vegetação.
+  <a class="cita" href="#ref-souza2017">Souza e Pires (2017)</a> mapearam os areais do Arroio Puitã entre 1984 e 2014 com
+  imagens Landsat e Máxima Verossimilhança, uma imagem por data; a transição entre campo e areal, de vegetação rala, saiu
+  como solo exposto, com resposta parecida com a de solo em cultivo inicial.
+  <a class="cita" href="#ref-rayne2023">Rayne et al. (2023)</a> detectaram campos desertificados no Marrocos com
+  Sentinel-2, Google Earth Engine e Random Forest, com acurácias de 74% a 76% na classe de desertificação. Este projeto
+  une as duas linhas: aplica o método de Rayne et al. ao problema regional, com 10 m de resolução e a série do ano
+  inteiro, para separar o areal da lavoura.</p>
+  <div class="rolagem"><table class="quadro">
+    <thead><tr><th scope="col">Critério</th><th scope="col">Souza e Pires (2017)</th><th scope="col">Rayne et al. (2023)</th>
+      <th scope="col" class="projeto">Este projeto</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Local</th><td>Arroio Puitã, RS</td><td>Oásis do sul do Marrocos</td><td class="projeto">Ottobacia Miracatu-Taquari, RS</td></tr>
+      <tr><th scope="row">Sensor e resolução</th><td>Landsat, 30 m</td><td>Sentinel-2 e Sentinel-1, 10 m</td><td class="projeto">Sentinel-2, 10 m</td></tr>
+      <tr><th scope="row">Tempo</th><td>1 imagem por data (1984–2014)</td><td>mediana de jun–ago 2021</td><td class="projeto">__SERIE__</td></tr>
+      <tr><th scope="row">Classificador</th><td>Máxima Verossimilhança</td><td>Random Forest (GEE)</td><td class="projeto">Random Forest (GEE)</td></tr>
+      <tr><th scope="row">Acurácia do alvo</th><td>—</td><td>74–76%</td><td class="projeto">F1 do Areal de __F1__</td></tr>
+      <tr><th scope="row">Limite</th><td>transição campo–areal confundida com cultivo</td><td>uma estação só</td><td class="projeto">sem verificação de campo</td></tr>
+    </tbody>
+  </table></div>
+  <div class="trabalhos">
+    <details class="cartao-texto">
+      <summary>Suertegaray (1992)</summary>
+      <p><b>O que fez:</b> definiu a arenização como um processo próprio do clima úmido do sudoeste gaúcho, distinto da
+      desertificação: o retrabalhamento de depósitos arenosos pouco consolidados.</p>
+      <p><b>O que aproveitamos:</b> o conceito, que define o alvo do mapa: areia exposta sobre depósitos arenosos, com
+      dificuldade de fixação da vegetação.</p>
+      <p><b>A lacuna:</b> o conceito precisa de um inventário atualizado e reprodutível dos areais, que é o que este
+      projeto produz.</p>
+    </details>
+    <details class="cartao-texto">
+      <summary>Souza e Pires (2017)</summary>
+      <p><b>O que fizeram:</b> o mapeamento multitemporal dos areais do Arroio Puitã de 1984 a 2014, com Landsat e
+      Máxima Verossimilhança, uma imagem por data.</p>
+      <p><b>O que aproveitamos:</b> a referência regional da dinâmica dos areais e o alerta de que a transição
+      campo–areal se parece com solo em cultivo inicial.</p>
+      <p><b>A lacuna:</b> com uma data e 30 m, o areal não se separa do solo exposto agrícola.</p>
+    </details>
+    <details class="cartao-texto">
+      <summary>Rayne et al. (2023)</summary>
+      <p><b>O que fizeram:</b> detectaram campos desertificados em oásis do sul do Marrocos com Sentinel-2 e Sentinel-1,
+      Google Earth Engine e Random Forest, sobre a mediana de jun–ago 2021.</p>
+      <p><b>O que aproveitamos:</b> o fluxo Sentinel-2, Earth Engine e Random Forest e o parâmetro realista de acurácia
+      (74–76% na classe-alvo).</p>
+      <p><b>A lacuna:</b> uma estação só, em clima árido. Aqui a série do ano inteiro separa o areal, exposto o ano
+      todo, da lavoura, exposta só em parte dele.</p>
+    </details>
+  </div>
 </section>
 
 <section class="secao" id="dados">
@@ -618,22 +738,43 @@ __VENTO__
   <div class="rolagem"><table id="tabela-metricas"></table></div>
   <p class="nota">Os pontos de teste vêm de áreas típicas de cada classe e têm o mesmo número por classe. A acurácia do
   mapa inteiro, que inclui bordas e pixels mistos e classes de tamanhos muito diferentes, tende a ser menor.</p>
+  __FIGURA_MATRIZ__
+  <div class="cartao-texto">
+    <h3>A lição do processo</h3>
+    <p>A primeira versão do mapa tinha mais de 90% de acurácia no teste, mas marcava 19% da bacia como areal. A
+    comparação com o MapBiomas revelou o excesso, e a revisão das amostras (areais duvidosos reclassificados e amostras
+    de Lavoura exposta) reduziu o areal para __PCT__% da bacia. <b>Acurácia alta no teste não garante um bom mapa:</b>
+    o teste mede o modelo em amostras típicas; a comparação com referências mede o mapa inteiro.</p>
+  </div>
 </section>
 
 <section class="secao" id="comparacao">
   __VENTO__
   <h2>Comparação com o MapBiomas e a SEMA-RS</h2>
   <p>A concordância geral com o MapBiomas 10 m é de <b>__CONCORDANCIA_MB__%</b> da área da bacia. No Areal, a concordância
-  é menor, e a diferença tem explicação: o MapBiomas classifica o <b>uso</b> da terra (um talhão inteiro é lavoura,
+  é menor, e parte da diferença vem de como cada base classifica: o MapBiomas classifica o <b>uso</b> da terra (um talhão inteiro é lavoura,
   mesmo com uma mancha de areia dentro) e a SEMA-RS mapeou os areais consolidados, em escala mais grosseira. Este mapa
   classifica a <b>cobertura</b> pixel a pixel, a 10 m.</p>
   <div class="cartao-texto">
     <h3>Onde está o Areal deste mapa, segundo o MapBiomas</h3>
     __EMPILHADA_MB__
     <p>__ACHADO_MB__</p>
-    <p>A conferência visual dos polígonos em conflito com a lavoura do MapBiomas mostrou, na maior parte dos casos,
-    <b>manchas de solo arenoso exposto dentro de áreas agrícolas</b>: focos de arenização que as bases de referência
-    não registram.</p>
+    <p>A conferência visual de 30 a 50 manchas em conflito com a lavoura do MapBiomas mostrou solo arenoso exposto na
+    maior parte delas.</p>
+    <p>Os solos do substrato arenoso da bacia são "muito frágeis e altamente suceptíveis [sic] à erosão hídrica"
+    (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>): quando a cobertura é removida, a "expansão lateral e remontante das ravinas e
+    voçorocas, promove a formação do areal propriamente dito" (<a class="cita" href="#ref-suertegaray2011">idem</a>), e a "constante mobilidade dos sedimentos"
+    dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>). Por isso, as manchas de solo arenoso exposto
+    encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>; parte ainda pode
+    ser manejo (pousio, preparo do solo), e a confirmação em campo é o próximo passo.</p>
+    <p>A literatura sustenta essa leitura. A arenização é o "retrabalhamento de depósitos areníticos (pouco
+    consolidados) ou arenosos (não consolidados)" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>), e "este processo poderá ser
+    desencadeado por agentes naturais ou atividades humanas" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Numa área piloto entre
+    São Francisco de Assis e Manoel Viana, a mesma região desta bacia, na frente de expansão da soja, a análise
+    multitemporal registrou aumento de 47,52 ha de areais em 25 anos, resultados que "indicam o surgimento de novas
+    manchas de areia (areais)" (Suertegaray; Guasselli; Franz, 1995 apud <a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Ravinas e
+    sulcos também podem resultar do "uso de maquinaria pesada na atividade agrícola"
+    (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 64</a>).</p>
   </div>
   __BLOCO_SEMA__
   <h3>Matriz de concordância</h3>
@@ -648,7 +789,7 @@ __VENTO__
   <ul>
     <li>A acurácia vem de amostras em áreas típicas de cada classe, sem verificação de campo. Uma amostra aleatória
     estratificada sobre o mapa permitiria estimar a acurácia sem esse viés e corrigir a área por classe
-    (Olofsson et al., 2014).</li>
+    (<a class="cita" href="#ref-olofsson2014">Olofsson et al., 2014</a>).</li>
     <li>A área é a contagem de pixels; ainda não tem intervalo de confiança.</li>
     <li>Talhões expostos quase o ano todo ainda podem se parecer com areal. Variáveis de textura ou classificação por
     objetos (segmentação) podem reduzir essa confusão.</li>
@@ -658,6 +799,8 @@ __VENTO__
     separaria os corpos d'água permanentes das áreas úmidas temporárias.</li>
     <li>A resolução de 10–20 m não captura areais muito pequenos ou estreitos, e areais sob silvicultura não aparecem.</li>
     <li>O mapa cobre um único ano. Aplicar o mesmo fluxo a anos anteriores permitiria medir a expansão dos areais.</li>
+    <li>Próximo passo: usar o inventário para validar o mapa de suscetibilidade à arenização por AHP do mestrado em
+    Geografia da UFSM.</li>
   </ul>
 </section>
 
@@ -666,15 +809,20 @@ __VENTO__
   <h2>Referências</h2>
   <ul class="nota">
     <li>MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Disponível em: brasil.mapbiomas.org.</li>
-    <li>OLOFSSON, P. et al. Good practices for estimating area and assessing accuracy of land change. <i>Remote Sensing of Environment</i>, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.</li>
-    <li>RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. <i>Scientific Reports</i>, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.</li>
+    <li id="ref-olofsson2014" data-doi="10.1016/j.rse.2014.02.015">OLOFSSON, P. et al. Good practices for estimating area and assessing accuracy of land change. <i>Remote Sensing of Environment</i>, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.</li>
+    <li id="ref-rayne2023" data-doi="10.1038/s41598-023-46319-1">RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. <i>Scientific Reports</i>, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.</li>
     <li>RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul.</li>
-    <li>SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. <i>Revista Brasileira de Geomorfologia</i>, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.</li>
+    <li id="ref-souza2017" data-doi="10.20502/rbg.v18i1.1051">SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. <i>Revista Brasileira de Geomorfologia</i>, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.</li>
+    <li id="ref-suertegaray1992">SUERTEGARAY, D. M. A. <i>Deserto Grande do Sul: controvérsia</i>. Porto Alegre: Editora da UFRGS, 1992.</li>
+    <li id="ref-suertegaray2011">SUERTEGARAY, D. M. A. Erosão nos campos sulinos: arenização no sudoeste do Rio Grande do Sul. <i>Revista Brasileira de Geomorfologia</i>, v. 12, n. 3, p. 61–74, 2011.</li>
   </ul>
   <h3>Créditos</h3>
-  <p class="nota">Autora: Franqueline Monback Noschang. Orientação: Prof. Romário Trentin. Professor ao longo do curso:
-  Emanuel Goulart. Apoio: Marco Antônio da Rosa Soares. Future Tech Leaders Brasil, Agência Espacial Brasileira (AEB),
-  SDG AI Lab e UNDP/ICPSD.</p>
+  <p class="nota">Autora: Franqueline Monback Noschang. Professor ao longo do curso: Emanuel Goulart.
+  Future Tech Leaders Brasil, Agência Espacial Brasileira (AEB), SDG AI Lab e UNDP/ICPSD.</p>
+  <p class="nota">Agradecimentos ao Prof. Romário Trentin, orientador do mestrado, como referência e pela integração
+  deste estudo à pesquisa sobre arenização, e a Marco Antônio da Rosa Soares, pelo apoio ao projeto.</p>
+  <p class="nota">Parte do código e da revisão do texto teve apoio de IA (Claude, Anthropic); as decisões de método, a
+  coleta e a conferência das amostras são da autora.</p>
 </section>
 
 __VENTO__
@@ -689,51 +837,105 @@ const DADOS = __DADOS__;
 const fmt = (v, c = 2) => v.toLocaleString("pt-BR", { minimumFractionDigits: c, maximumFractionDigits: c });
 
 // ---------------------------------------------------------------- Mapa
-const mapa = L.map("mapa", { zoomControl: false, scrollWheelZoom: false });
+const limites = [[__SUL__, __OESTE__], [__NORTE__, __LESTE__]];
+// A posição vem antes de qualquer camada: sem ela, o Leaflet adia a montagem das camadas
+const mapa = L.map("mapa", { zoomControl: false, scrollWheelZoom: false }).fitBounds(limites);
 L.control.zoom({ position: "topright" }).addTo(mapa);
 mapa.on("focus click", () => mapa.scrollWheelZoom.enable());
 [["fundo", 250], ["mapbiomas", 410], ["classes", 420], ["areal", 430], ["limite", 440]].forEach(([nome, z]) => {
   mapa.createPane(nome).style.zIndex = z;
 });
-const limites = [[__SUL__, __OESTE__], [__NORTE__, __LESTE__]];
 
 // Fundos: Sentinel-2 do mesmo ano (mediana usada na classificação), satélite de alta resolução ou OpenStreetMap
 const satelite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   { maxZoom: 18, attribution: "Imagem: Esri" });
 const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" });
-const PERIODOS = __PERIODOS__;   // [arquivo, rótulo]; o primeiro é a mediana do ano
-const sentinel = PERIODOS.length ? L.imageOverlay(PERIODOS[0][0], limites,
-  { pane: "fundo", interactive: false, attribution: "Sentinel-2: ESA/Copernicus" }) : null;
+// Linha do tempo Sentinel-2: [arquivo, rótulo], a mediana do ano primeiro e depois os bimestres.
+// Duas camadas se alternam para a sobreposição cruzada; cada WebP só é baixado quando é exibido.
+const PERIODOS = __PERIODOS__;
+const VAZIO = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+const camadasS2 = PERIODOS.length ? [0, 1].map(() => L.imageOverlay(VAZIO, limites,
+  { pane: "fundo", interactive: false, opacity: 0, className: "imagem-s2", attribution: "Sentinel-2: ESA/Copernicus" })) : [];
 const periodo = document.getElementById("periodo");
+const rotuloPeriodo = document.getElementById("rotulo-periodo");
 const ctrlPeriodo = document.getElementById("ctrl-periodo");
+const botaoPlay = document.getElementById("play");
 periodo.max = Math.max(PERIODOS.length - 1, 0);
-function escolherPeriodo() {
-  if (!sentinel) return;
-  sentinel.setUrl(PERIODOS[periodo.value][0]);
-  document.getElementById("rotulo-periodo").textContent = PERIODOS[periodo.value][1];
+let visivel = 0, indicePeriodo = 0, pedidoPeriodo = 0, temporizador = null;
+
+function mostrarPeriodo(i) {
+  indicePeriodo = i;
+  periodo.value = i;
+  rotuloPeriodo.textContent = PERIODOS.length ? PERIODOS[i][1] : "";
+  if (!camadasS2.length || !mapa.hasLayer(camadasS2[0])) return;
+  const atual = camadasS2[visivel], proxima = camadasS2[1 - visivel];
+  const url = new URL(PERIODOS[i][0], location.href).href;
+  if (atual.getElement().src === url && atual.options.opacity > 0) return;
+  const meu = ++pedidoPeriodo;
+  const trocar = () => {
+    if (meu !== pedidoPeriodo) return;   // outro período foi pedido enquanto esta imagem carregava
+    proxima.setOpacity(1);
+    atual.setOpacity(0);
+    visivel = 1 - visivel;
+  };
+  if (proxima.getElement().src === url && proxima.getElement().complete) trocar();
+  else { proxima.once("load", trocar); proxima.setUrl(PERIODOS[i][0]); }
 }
-periodo.addEventListener("input", escolherPeriodo);
-escolherPeriodo();
-const camadasFundo = { s2: [satelite, sentinel], esri: [satelite], osm: [osm] };
+
+const precarregadas = new Set();
+function precarregar(i) {
+  const url = PERIODOS[i][0];
+  if (!precarregadas.has(url)) { precarregadas.add(url); new Image().src = url; }
+}
+
+function tocar(ligar) {
+  clearInterval(temporizador);
+  temporizador = null;
+  botaoPlay.setAttribute("aria-pressed", ligar);
+  botaoPlay.setAttribute("aria-label", ligar ? "Pausar a linha do tempo" : "Reproduzir a linha do tempo");
+  if (!ligar) return;
+  const proximo = () => (indicePeriodo + 1) % PERIODOS.length;
+  precarregar(proximo());
+  temporizador = setInterval(() => {
+    mostrarPeriodo(proximo());
+    precarregar(proximo());
+  }, 1500);
+}
+botaoPlay.addEventListener("click", () => tocar(botaoPlay.getAttribute("aria-pressed") !== "true"));
+periodo.addEventListener("input", () => { tocar(false); mostrarPeriodo(+periodo.value); });
+
+const camadasFundo = { s2: [satelite, ...camadasS2], esri: [satelite], osm: [osm] };
 function escolherFundo(chave) {
-  [satelite, osm, sentinel].forEach((c) => c && c.remove());
-  camadasFundo[chave].forEach((c) => c && c.addTo(mapa));
+  tocar(false);
+  [satelite, osm, ...camadasS2].forEach((c) => c.remove());
+  camadasFundo[chave].forEach((c) => c.addTo(mapa));
   ctrlPeriodo.hidden = chave !== "s2" || PERIODOS.length < 2;
+  if (chave === "s2") {
+    camadasS2.forEach((c) => c.setOpacity(0));
+    mostrarPeriodo(indicePeriodo);
+  }
 }
 const seletorFundo = document.getElementById("fundo");
 seletorFundo.addEventListener("change", () => escolherFundo(seletorFundo.value));
 escolherFundo(seletorFundo.value);
-const classes = L.imageOverlay("classes___ANO__.png", limites, { pane: "classes", opacity: 0.75 }).addTo(mapa);
-L.imageOverlay("areal___ANO__.png", limites, { pane: "areal", opacity: 1 }).addTo(mapa);
+const URL_CLASSES = "classes___ANO__.png";
+const classes = L.imageOverlay(URL_CLASSES, limites, { pane: "classes", opacity: 0.75 }).addTo(mapa);
+const areal = L.imageOverlay("areal___ANO__.png", limites, { pane: "areal", opacity: 1 }).addTo(mapa);
 const mapbiomas = __TEM_MB__ ? L.imageOverlay("mapbiomas___ANO__.png", limites, { pane: "mapbiomas", opacity: 0.75 }) : null;
 
-const contornos = L.geoJSON(__AREAIS__, {
+const contornos = L.geoJSON(null, {
   pane: "areal",
   style: { color: "#8A2A12", weight: 0.5, fillOpacity: 0 },
   onEachFeature: (f, camada) => camada.bindPopup("Areal: " + fmt(f.properties.area_ha) + " ha"),
 });
-const bacia = L.geoJSON(__BACIA__, { pane: "limite", interactive: false, style: { color: "#fff", weight: 2, fill: false } }).addTo(mapa);
-mapa.fitBounds(bacia.getBounds());
+const bacia = L.geoJSON(null, { pane: "limite", interactive: false, style: { color: "#fff", weight: 2, fill: false } }).addTo(mapa);
+// Polígonos em arquivos separados (docs/), carregados depois do mapa
+const lerGeoJSON = (arquivo, camada) => fetch(arquivo)
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((d) => camada.addData(d))
+  .catch((e) => console.warn(`Não foi possível carregar ${arquivo} (${e}). Abra a página por um servidor (http), não pelo arquivo.`));
+lerGeoJSON("bacia.geojson", bacia);
+lerGeoJSON("areais___ANO__.geojson", contornos);
 
 function atualizarContornos() {
   if (mapa.getZoom() >= 14) contornos.addTo(mapa); else contornos.remove();
@@ -741,9 +943,55 @@ function atualizarContornos() {
 mapa.on("zoomend", atualizarContornos);
 atualizarContornos();
 
-document.getElementById("opacidade").addEventListener("input", (e) => {
-  classes.setOpacity(e.target.value / 100);
-  if (mapbiomas) mapbiomas.setOpacity(e.target.value / 100);
+const opacidade = document.getElementById("opacidade");
+opacidade.addEventListener("input", () => {
+  if (!classeAtiva || classeAtiva.dataset.classe !== "1") classes.setOpacity(opacidade.value / 100);
+  if (mapbiomas) mapbiomas.setOpacity(opacidade.value / 100);
+});
+
+// Destaque pela legenda: a classe escolhida fica como está e as outras esmaecem no mapa.
+// O PNG de classes é recolorido num canvas (uma vez por classe); o Areal, que tem camada própria, esmaece junto.
+const pngClasses = new Image();
+pngClasses.src = URL_CLASSES;
+const urlsDestaque = {};
+function urlDestaque(cor) {
+  if (urlsDestaque[cor]) return urlsDestaque[cor];
+  if (!pngClasses.complete || !pngClasses.naturalWidth) return null;
+  const tela = document.createElement("canvas");
+  tela.width = pngClasses.naturalWidth;
+  tela.height = pngClasses.naturalHeight;
+  const ctx = tela.getContext("2d");
+  ctx.drawImage(pngClasses, 0, 0);
+  const dados = ctx.getImageData(0, 0, tela.width, tela.height);
+  const p = dados.data;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(cor.slice(i, i + 2), 16));
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] && (p[i] !== r || p[i + 1] !== g || p[i + 2] !== b)) p[i + 3] = 38;
+  }
+  ctx.putImageData(dados, 0, 0);
+  return (urlsDestaque[cor] = tela.toDataURL());
+}
+const listaLegenda = document.querySelector("#legenda ul");
+const itensClasse = [...document.querySelectorAll(".item-classe")];
+let classeFixa = null, classeAtiva = null;
+function destacar(item) {
+  classeAtiva = item;
+  itensClasse.forEach((li) => li.classList.toggle("ativo", li === item));
+  listaLegenda.classList.toggle("destacando", !!item);
+  const ehAreal = item && item.dataset.classe === "1";
+  const url = item && !ehAreal ? urlDestaque(item.dataset.cor) : null;
+  classes.setUrl(url || URL_CLASSES);
+  classes.setOpacity(ehAreal ? opacidade.value / 400 : opacidade.value / 100);
+  areal.setOpacity(item && !ehAreal ? 0.15 : 1);
+}
+const voltarDestaque = () => destacar(classeFixa);
+itensClasse.forEach((li) => {
+  li.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") destacar(li); });
+  li.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") voltarDestaque(); });
+  li.addEventListener("focus", () => destacar(li));
+  li.addEventListener("blur", voltarDestaque);
+  li.addEventListener("click", () => { classeFixa = classeFixa === li ? null : li; voltarDestaque(); });
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); li.click(); } });
 });
 
 const divisor = document.getElementById("divisor");
@@ -778,7 +1026,68 @@ divisor.addEventListener("input", recortar);
 ["mousedown", "touchstart"].forEach((ev) => divisor.addEventListener(ev, () => mapa.dragging.disable()));
 ["mouseup", "touchend"].forEach((ev) => divisor.addEventListener(ev, () => mapa.dragging.enable()));
 mapa.on("move zoom resize", recortar);
-if (window.matchMedia("(max-width: 700px)").matches) document.getElementById("legenda").open = false;
+if (window.matchMedia("(max-width: 700px)").matches) {
+  document.getElementById("legenda").open = false;
+  document.getElementById("controles").open = false;
+}
+
+// ---------------------------------------------------------------- Números dos cartões contam até o valor final
+if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  document.querySelectorAll(".cartao b[data-valor]").forEach((el) => {
+    const alvo = +el.dataset.valor, casas = +el.dataset.casas, sufixo = el.dataset.sufixo || "";
+    const inicio = performance.now(), duracao = 800;
+    const passo = (agora) => {
+      const t = Math.min((agora - inicio) / duracao, 1);
+      el.textContent = fmt(alvo * (1 - Math.pow(1 - t, 3)), casas) + sufixo;
+      if (t < 1) requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  });
+}
+
+// ---------------------------------------------------------------- Citações: balão com a referência e o DOI
+const balao = document.createElement("div");
+balao.className = "balao";
+balao.setAttribute("role", "dialog");
+balao.hidden = true;
+document.body.appendChild(balao);
+let citaAberta = null, fecharDepois = null;
+function abrirCitacao(link) {
+  clearTimeout(fecharDepois);
+  const ref = document.querySelector(link.getAttribute("href"));
+  if (!ref) return;
+  balao.innerHTML = ref.innerHTML + (ref.dataset.doi
+    ? `<br><a class="botao-doi" href="https://doi.org/${ref.dataset.doi}" target="_blank" rel="noopener">DOI ↗</a>` : "");
+  balao.hidden = false;
+  const r = link.getBoundingClientRect();
+  const largura = balao.offsetWidth;
+  balao.style.left = Math.max(8, Math.min(r.left + scrollX, scrollX + document.documentElement.clientWidth - largura - 8)) + "px";
+  balao.style.top = r.bottom + scrollY + 6 + "px";
+  requestAnimationFrame(() => balao.classList.add("visivel"));
+  if (citaAberta) citaAberta.setAttribute("aria-expanded", "false");
+  citaAberta = link;
+  link.setAttribute("aria-expanded", "true");
+}
+function fecharCitacao() {
+  balao.classList.remove("visivel");
+  balao.hidden = true;
+  if (citaAberta) citaAberta.setAttribute("aria-expanded", "false");
+  citaAberta = null;
+}
+document.querySelectorAll(".cita").forEach((link) => {
+  link.setAttribute("aria-haspopup", "dialog");
+  link.setAttribute("aria-expanded", "false");
+  link.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") abrirCitacao(link); });
+  link.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") fecharDepois = setTimeout(fecharCitacao, 250); });
+  link.addEventListener("click", (e) => {   // toque e teclado: abre e fecha o balão em vez de pular para a lista
+    e.preventDefault();
+    if (citaAberta === link && e.pointerType !== "mouse") fecharCitacao(); else abrirCitacao(link);
+  });
+});
+balao.addEventListener("pointerenter", () => clearTimeout(fecharDepois));
+balao.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") fecharDepois = setTimeout(fecharCitacao, 250); });
+document.addEventListener("click", (e) => { if (citaAberta && !balao.contains(e.target) && !e.target.closest(".cita")) fecharCitacao(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && citaAberta) { const l = citaAberta; fecharCitacao(); l.focus(); } });
 
 // ---------------------------------------------------------------- Abas reutilizáveis
 function criarAbas(idContainer, opcoes, aoEscolher) {

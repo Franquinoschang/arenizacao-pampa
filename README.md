@@ -284,7 +284,7 @@ A concordância geral com o MapBiomas 10 m é de 79% da área da bacia.
 **Areal e MapBiomas 10 m (2025).**
 
 - 13,6 km² do areal deste mapa também são areal no MapBiomas: 46% do areal mapeado e 57% do areal do MapBiomas.
-- 8,2 km² (28%) do areal mapeado caem sobre lavoura do MapBiomas, 2,2 km² sobre *outras áreas não vegetadas* e 3,1 km² sobre *mosaico de usos*. O MapBiomas classifica o uso da terra: um talhão inteiro é lavoura, mesmo com uma mancha de areia dentro. Este mapa classifica a cobertura pixel a pixel, a 10 m. Na conferência visual de 30 a 50 polígonos de "Areal × Lavoura" (`conferencia_conflitos_2025.shp`), a maior parte correspondia a manchas de solo arenoso exposto dentro das lavouras, focos de arenização que as bases de referência não registram. Parte da diferença ainda pode ser de talhões expostos quase o ano todo, confundidos com o areal.
+- 8,2 km² (28%) do areal mapeado caem sobre lavoura do MapBiomas, 2,2 km² sobre *outras áreas não vegetadas* e 3,1 km² sobre *mosaico de usos*. O MapBiomas classifica o uso da terra: um talhão inteiro é lavoura, mesmo com uma mancha de areia dentro. Este mapa classifica a cobertura pixel a pixel, a 10 m. Na conferência visual de 30 a 50 polígonos de "Areal × Lavoura" (`conferencia_conflitos_2025.shp`), a maior parte correspondia a manchas de solo arenoso exposto dentro das lavouras, áreas fragilizadas, com possíveis focos de arenização que as bases de referência não registram. Os solos do substrato arenoso da bacia são "muito frágeis e altamente suceptíveis [sic] à erosão hídrica" (SUERTEGARAY, 2011, p. 69), e o processo "poderá ser desencadeado por agentes naturais ou atividades humanas" (SUERTEGARAY, 2011, p. 69). Parte da diferença ainda pode ser manejo (pousio, preparo do solo) ou talhões expostos quase o ano todo; a confirmação em campo é o próximo passo.
 - 7,5 km² de areal do MapBiomas foram classificados como Campo neste mapa, sobretudo bordas e areais com vegetação rala.
 
 **SEMA-RS.** 11,3 km² do areal deste mapa estão dentro dos areais da SEMA-RS (38% do areal mapeado; 40% da área da SEMA na bacia). Outros 11,1 km² dos areais da SEMA foram classificados como Campo, o que pode indicar recolonização vegetal desde o mapeamento da SEMA ou bordas com vegetação rala.
@@ -313,6 +313,8 @@ A primeira versão do mapa tinha acurácia de teste acima de 0,90, mas classific
 - RAYNE, L.; BRANDOLINI, F.; MAKOVICS, J. L. et al. Detecting desertification in the ancient oases of southern Morocco. *Scientific Reports*, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.
 - RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul.
 - SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. *Revista Brasileira de Geomorfologia*, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.
+- SUERTEGARAY, D. M. A. *Deserto Grande do Sul: controvérsia*. Porto Alegre: Editora da UFRGS, 1992.
+- SUERTEGARAY, D. M. A. Erosão nos campos sulinos: arenização no sudoeste do Rio Grande do Sul. *Revista Brasileira de Geomorfologia*, v. 12, n. 3, p. 61–74, 2011.
 
 ## 13. Licença
 
@@ -323,4 +325,4 @@ Código sob licença **MIT**. Dados produzidos neste projeto sob **CC BY 4.0**. 
 Future Tech Leaders Brasil, Agência Espacial Brasileira (AEB), SDG AI Lab, UNDP / ICPSD.
 Emanuel Goulart, professor ao longo do curso.
 Marco Antônio da Rosa Soares, amigo e apoiador do projeto.
-Professor orientador Romário Trentin.
+Prof. Romário Trentin, orientador do mestrado, como referência e pela integração deste estudo à pesquisa sobre arenização.
