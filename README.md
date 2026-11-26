@@ -57,10 +57,10 @@ Todos os dados são públicos, acessados pelo Google Earth Engine (GEE) ou por d
 | Cloud Score+ (`GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED`) | Google, via GEE | Raster | Máscara de nuvens |
 | Limite da ottobacia 682636 (`data/raw/area_de_estudo.shp`) | ANA – Base Hidrográfica Ottocodificada | Shapefile | Recorte da área de estudo |
 | MapBiomas 10 m, Coleção 4, 2025 | MapBiomas, via GEE | Raster, 10 m | Apoio à amostragem, controle de qualidade e comparação do mapa final |
-| Mapeamento de areais do RS, recortado na bacia (`data/raw/Areais_area_estudo_SEMA/areais.shp`, 173 polígonos, 28,4 km²; não incluído no repositório) | SEMA-RS | Vetor | Apoio à localização dos areais, controle de qualidade e comparação do mapa final |
+| Mapeamento de areais do RS (2020), recortado na bacia (`data/raw/Areais_area_estudo_SEMA/areais.shp`, 173 polígonos, 28,4 km²; não incluído no repositório) | SEMA-RS | Vetor | Apoio à localização dos areais, controle de qualidade e comparação do mapa final |
 | Amostras rotuladas | Produzidas neste projeto | GeoJSON / Shapefile | Treino e teste |
 
-**Areais da SEMA-RS.** São dados de terceiros e não estão no repositório. O mapeamento de areais do RS está no banco de dados da SEMA-RS; o recorte usado aqui é a camada de areais da área de estudo, salva como `data/raw/Areais_area_estudo_SEMA/areais.shp`. O arquivo é opcional: sem ele, o notebook pula o controle de qualidade e as comparações com a SEMA-RS.
+**Areais da SEMA-RS.** São dados de terceiros e não estão no repositório. O mapeamento de areais do RS (2020) está em https://sema.rs.gov.br/areais; o recorte usado aqui é a camada de areais da área de estudo, salva como `data/raw/Areais_area_estudo_SEMA/areais.shp`. O arquivo é opcional: sem ele, o notebook pula o controle de qualidade e as comparações com a SEMA-RS.
 
 ### Camadas de apoio à coleta de amostras
 
@@ -311,7 +311,7 @@ A primeira versão do mapa tinha acurácia de teste acima de 0,90, mas classific
 - MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Código: github.com/mapbiomas/brazil-pampa. Disponível em: brasil.mapbiomas.org.
 - OLOFSSON, P.; FOODY, G. M.; HEROLD, M. et al. Good practices for estimating area and assessing accuracy of land change. *Remote Sensing of Environment*, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.
 - RAYNE, L.; BRANDOLINI, F.; MAKOVICS, J. L. et al. Detecting desertification in the ancient oases of southern Morocco. *Scientific Reports*, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.
-- RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul.
+- RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul. 2020. Disponível em: https://sema.rs.gov.br/areais.
 - SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. *Revista Brasileira de Geomorfologia*, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.
 - SUERTEGARAY, D. M. A. *Deserto Grande do Sul: controvérsia*. Porto Alegre: Editora da UFRGS, 1992.
 - SUERTEGARAY, D. M. A. Erosão nos campos sulinos: arenização no sudoeste do Rio Grande do Sul. *Revista Brasileira de Geomorfologia*, v. 12, n. 3, p. 61–74, 2011.

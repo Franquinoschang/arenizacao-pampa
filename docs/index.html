@@ -19,117 +19,131 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
+  /* Tema areia (DESIGN.md): o roxo FTL é só acento — botões, links, controle ativo e foco */
   :root {
-    --roxo: #4617DE; --limao: #DDFB0B;
-    --fundo: #FAF6EF; --superficie: #EADFCB; --duna: #C9B48F;
-    --texto: #1E1B2E; --texto-suave: #5C566E; --link: #4617DE; --numero: #1E1B2E;
-    --calor: 70, 23, 222;
-    --sombra: 0 2px 10px rgba(30, 27, 46, 0.08);
+    --roxo: #4617DE; --sobre-acento: #FFFFFF;
+    --fundo: #F6EFE3; --superficie: #EDE2CE; --duna: #D9C6A5;
+    --texto: #2B2420; --texto-suave: #6B5E52; --link: #4617DE; --numero: #2B2420;
+    --calor: 139, 94, 52;
+    --sombra: 0 2px 10px rgba(43, 36, 32, 0.08);
     --curva: cubic-bezier(0.2, 0.7, 0.2, 1);
     --titulo: "Space Grotesk", system-ui, sans-serif;
     --corpo: "Inter", system-ui, sans-serif;
+    --altura-mapa-celular: 45vh;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --fundo: #15122B; --superficie: #221D40; --duna: #4A4270;
-      --texto: #EDEAF5; --texto-suave: #B7B1CC; --link: #A48CFF; --numero: #DDFB0B;
-      --calor: 164, 140, 255;
+      --roxo: #8F7CFF; --sobre-acento: #1F1A15;
+      --fundo: #1F1A15; --superficie: #2A231C; --duna: #4A3E32;
+      --texto: #F1E8DA; --texto-suave: #BFAF98; --link: #8F7CFF; --numero: #F1E8DA;
+      --calor: 217, 198, 165;
       --sombra: 0 2px 10px rgba(0, 0, 0, 0.35);
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
-  body { margin: 0; background: var(--fundo); color: var(--texto); font: 400 16px/1.6 var(--corpo); }
+  html { scroll-behavior: smooth; scroll-padding-top: 56px; }
+  /* Textura de areia: ruído SVG leve sobre o fundo (os painéis, tabelas e o mapa têm fundo próprio) */
+  body { margin: 0; color: var(--texto); font: 400 16px/1.6 var(--corpo); background-color: var(--fundo);
+         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='r'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23r)' opacity='0.06'/%3E%3C/svg%3E"); }
   a { color: var(--link); }
-  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
     outline: 2px solid var(--roxo); outline-offset: 2px; }
   h1, h2, h3 { font-family: var(--titulo); margin: 0; }
-  h2 { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
-  h3 { font-size: 20px; font-weight: 600; margin: 24px 0 8px; }
+  h2 { font-size: 26px; font-weight: 700; margin-bottom: 16px; }
+  h3 { font-size: 19px; font-weight: 600; margin: 24px 0 8px; }
   .num, .valor, .cartao b, td { font-variant-numeric: tabular-nums; }
 
-  .topo { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 24px 32px 16px; }
+  /* ------------------------------------------------ Story map: mapa fixo + coluna de texto */
+  .coluna-mapa { position: sticky; top: 0; height: var(--altura-mapa-celular); z-index: 1500; }
+  .coluna-mapa.tela-cheia { position: fixed; inset: 0; height: 100vh; height: 100dvh; z-index: 5000; }
+  body.mapa-aberto { overflow: hidden; }
+  .area-mapa { position: relative; height: 100%; overflow: hidden; background: var(--superficie); }
+  #mapa { position: absolute; inset: 0; }
+  .coluna-texto { min-width: 0; }
+  @media (min-width: 900px) {
+    .story { display: grid; grid-template-columns: minmax(0, 58fr) minmax(0, 42fr); align-items: start; }
+    .coluna-mapa { height: 100vh; z-index: 1; }
+    .botao-expandir { display: none; }
+  }
+
+  .topo { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 24px 32px 8px; }
   .sobre { margin: 0 0 4px; font-size: 13px; color: var(--texto-suave); }
-  .topo h1 { font-size: 40px; line-height: 1.1; font-weight: 700; }
+  .topo h1 { font-size: 34px; line-height: 1.12; font-weight: 700; }
   .topo .sub { margin: 8px 0 0; color: var(--texto-suave); }
-  .selo { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 12px; border-radius: 999px;
-          background: var(--roxo); color: #fff; font: 600 16px var(--titulo); }
-  @media (prefers-color-scheme: dark) { .selo { background: var(--limao); color: #15122B; } }
+  .selo { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 10px; border-radius: 999px;
+          border: 1.5px solid var(--roxo); color: var(--roxo); font: 600 15px var(--titulo); }
   .logos { display: flex; gap: 16px; align-items: center; }
-  .logos img { height: 56px; max-width: 100%; object-fit: contain; }
-  @media (prefers-color-scheme: dark) { .logos { background: #FAF6EF; padding: 8px 16px; border-radius: 14px; } }
+  .logos img { height: 48px; max-width: 100%; object-fit: contain; }
+  @media (prefers-color-scheme: dark) { .logos { background: #F6EFE3; padding: 8px 16px; border-radius: 14px; } }
   .vento { display: block; width: 100%; height: 24px; }
   .vento path { fill: none; stroke: var(--duna); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 
-  .menu { position: sticky; top: 0; z-index: 2000; background: var(--fundo); border-bottom: 1px solid var(--duna); }
-  .menu ul { display: flex; gap: 4px; list-style: none; margin: 0 auto; padding: 8px 32px; overflow-x: auto; }
+  .menu { position: sticky; top: 0; z-index: 1400; background: var(--fundo); border-bottom: 1px solid var(--duna); }
+  .menu ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 8px 24px; overflow-x: auto; }
   .menu a { display: block; padding: 4px 12px; border-radius: 999px; text-decoration: none; font-size: 14px;
             white-space: nowrap; transition: background 200ms var(--curva), color 200ms var(--curva); }
-  .menu a.ativo { background: var(--roxo); color: #fff; }
+  .menu a.ativo { background: var(--roxo); color: var(--sobre-acento); }
 
-  .numeros { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px 32px; }
-  .cartao { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 24px; min-width: 180px; }
-  .cartao b { display: block; font: 700 40px/1.1 var(--titulo); color: var(--numero); }
+  .numeros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .cartao { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 14px 18px; }
+  .cartao b { display: block; font: 700 36px/1.1 var(--titulo); color: var(--numero); }
   .cartao span { font-size: 13px; color: var(--texto-suave); }
+  .cartao .explica { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--texto-suave); }
 
-  .area-mapa { position: relative; height: 72vh; min-height: 420px; margin: 0 32px; border-radius: 14px; overflow: hidden; box-shadow: var(--sombra); }
-  #mapa { position: absolute; inset: 0; }
+  /* ------------------------------------------------ Painéis sobre o mapa (nos cantos, recolhíveis) */
   .painel { position: absolute; z-index: 1000; background: var(--superficie); color: var(--texto); border-radius: 14px;
-            box-shadow: var(--sombra); padding: 8px 16px; font-size: 13px; }
-  .legenda { left: 16px; bottom: 24px; max-width: 280px; }
-  .legenda summary { font: 600 16px var(--titulo); cursor: pointer; padding: 4px 0; }
+            box-shadow: var(--sombra); padding: 6px 14px; font-size: 13px; }
+  .painel summary { font: 600 14px var(--titulo); cursor: pointer; padding: 4px 0; }
+  .controles { left: 12px; top: 12px; }
+  .conteudo-controles { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+  .controles label { display: flex; flex-direction: column; gap: 4px; }
+  .controles input[type=range] { accent-color: var(--roxo); width: 210px; }
+  .controles .seletor { width: 210px; font-size: 13px; }
+  .legenda { left: 12px; bottom: 24px; max-width: 260px; }
   .legenda ul { list-style: none; margin: 4px 0 8px; padding: 0; }
   .legenda li { display: flex; align-items: center; gap: 8px; padding: 2px 4px; margin: 0 -4px; border-radius: 6px;
                 transition: opacity 200ms var(--curva), background 200ms var(--curva); }
   .item-classe { cursor: pointer; }
-  .item-classe:focus-visible { outline: 2px solid var(--roxo); outline-offset: 0; }
-  .legenda ul.destacando .item-classe { opacity: 0.4; }
-  .legenda ul.destacando .item-classe.ativo { opacity: 1; background: color-mix(in srgb, var(--roxo) 14%, transparent); }
+  .legenda ul.destacando .item-classe { opacity: 0.45; }
+  .legenda ul.destacando .item-classe.ativo { opacity: 1; background: color-mix(in srgb, var(--duna) 70%, transparent); }
+  .legenda .km { margin-left: auto; padding-left: 16px; color: var(--texto-suave); }
+  .cor { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(0, 0, 0, 0.2); }
+  .botao-expandir { position: absolute; z-index: 1000; right: 10px; bottom: 26px; font: 600 13px var(--corpo);
+                    padding: 6px 14px; border-radius: 999px; border: 2px solid var(--roxo); background: var(--superficie);
+                    color: var(--link); cursor: pointer; box-shadow: var(--sombra); }
   .imagem-s2 { transition: opacity 400ms var(--curva); }
-  .cartao .explica { display: block; max-width: 220px; margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--texto-suave); }
-  .quadro { font-size: 14px; min-width: 620px; }
-  .quadro th[scope=row] { font-weight: 600; white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--fundo); }
-  .figura-matriz img { display: block; max-width: 620px; margin: 0 auto; background: #fff; }
-  .quadro th.projeto { background: var(--roxo); color: #fff; border-radius: 8px 8px 0 0; }
-  .quadro td.projeto { background: color-mix(in srgb, var(--roxo) 12%, transparent); font-weight: 500; }
-  .trabalhos { display: grid; gap: 8px; margin-top: 16px; }
-  .trabalhos summary { font: 600 16px var(--titulo); cursor: pointer; }
-  .trabalhos p { margin: 8px 0 0; font-size: 15px; }
-  .cita { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
-  .balao { position: absolute; z-index: 3000; max-width: min(340px, calc(100vw - 16px)); background: var(--superficie);
-           color: var(--texto); border-radius: 14px; box-shadow: 0 4px 18px rgba(30, 27, 46, 0.22); padding: 12px 16px;
-           font-size: 13px; line-height: 1.45; opacity: 0; transform: translateY(4px);
-           transition: opacity 150ms var(--curva), transform 150ms var(--curva); }
-  .balao.visivel { opacity: 1; transform: none; }
-  .balao .botao-doi { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; background: var(--roxo);
-                      color: #fff; text-decoration: none; font-weight: 500; }
+  .legenda-indice { left: 12px; bottom: 24px; width: 260px; }
+  .legenda-indice b { display: block; font: 600 14px var(--titulo); }
+  .li-periodo { font-size: 12px; color: var(--texto-suave); }
+  .barra-cor { height: 12px; border-radius: 999px; margin: 8px 0 2px; border: 1px solid rgba(0, 0, 0, 0.15); }
+  .escala { display: flex; justify-content: space-between; font-size: 12px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+  #li-significado { margin: 6px 0 0; font-size: 12px; line-height: 1.4; }
+  .li-nota { margin: 4px 0 2px; font-size: 11px; color: var(--texto-suave); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--superficie); color: var(--texto); }
+  .popup-areal { font: 13px/1.4 var(--corpo); }
+  .mini-abas { display: flex; gap: 4px; margin: 6px 0 2px; }
+  .mini-aba { font: 600 11px var(--corpo); padding: 2px 9px; border-radius: 999px; border: 1.5px solid var(--roxo);
+              background: transparent; color: var(--link); cursor: pointer; }
+  .mini-aba[aria-pressed=true] { background: var(--roxo); color: var(--sobre-acento); }
+  .minigrafico { display: block; width: 260px; height: 132px; }
+  .minigrafico text { font: 10px var(--corpo); fill: var(--texto-suave); }
+  .minigrafico line { stroke: var(--duna); stroke-width: 1; }
+  .mini-legenda { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; margin: 2px 0 4px; }
+  .mini-legenda span::before { content: ""; display: inline-block; width: 14px; height: 0; margin: 0 4px 3px 0;
+                               border-top: 2.5px solid var(--cor); vertical-align: middle; }
+  .mini-legenda span.tracejada::before { border-top: 2px dashed var(--cor); }
+  .popup-areal small { color: var(--texto-suave); font-size: 11px; }
   .linha-tempo { display: flex; flex-direction: column; gap: 4px; }
   .tempo { display: flex; align-items: center; gap: 8px; }
   .controles .tempo input[type=range] { flex: 1; width: auto; min-width: 0; }
   .botao-play { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: none;
-                border-radius: 999px; background: var(--roxo); color: #fff; cursor: pointer;
+                border-radius: 999px; background: var(--roxo); color: var(--sobre-acento); cursor: pointer;
                 transition: transform 200ms var(--curva); }
   .botao-play:hover { transform: scale(1.06); }
   .botao-play svg { width: 14px; height: 14px; fill: currentColor; }
   .botao-play .icone-pausa, .botao-play[aria-pressed=true] .icone-play { display: none; }
   .botao-play[aria-pressed=true] .icone-pausa { display: inline; }
-  @media (prefers-reduced-motion: reduce) {
-    .imagem-s2, .legenda li, .botao-play, .barra, .bigode, .menu a, .botao, .balao { transition: none; }
-    html { scroll-behavior: auto; }
-  }
-  .cor { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(0, 0, 0, 0.2); }
-  .legenda .km { margin-left: auto; padding-left: 16px; color: var(--texto-suave); }
-  .controles { left: 16px; top: 16px; }
-  .controles summary { font: 600 14px var(--titulo); cursor: pointer; padding: 4px 0; }
-  .conteudo-controles { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
-  .controles label { display: flex; flex-direction: column; gap: 4px; }
-  .controles input[type=range] { accent-color: var(--roxo); width: 220px; }
-  .controles .seletor { width: 220px; font-size: 13px; }
-  .dica { max-width: 980px; margin: 8px auto 0; padding: 0 32px; font-size: 13px; color: var(--texto-suave); }
-  .botao { font: 500 13px var(--corpo); border-radius: 999px; padding: 6px 16px; cursor: pointer; border: 2px solid var(--roxo);
-           background: transparent; color: var(--link); transition: background 200ms var(--curva), color 200ms var(--curva); }
-  .botao[aria-pressed=true] { background: var(--roxo); color: #fff; }
   .divisor { position: absolute; z-index: 900; left: 0; top: 50%; width: 100%; height: 36px; margin: 0; transform: translateY(-50%);
              -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none; }
   .divisor::-webkit-slider-runnable-track { background: transparent; }
@@ -138,40 +152,61 @@
   .divisor::-moz-range-thumb { pointer-events: auto; width: 30px; height: 30px; border-radius: 999px; background: var(--roxo);
                                border: 3px solid #fff; cursor: ew-resize; }
   .linha { position: absolute; z-index: 899; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; pointer-events: none; }
-  .lado { position: absolute; z-index: 899; top: 140px; padding: 2px 12px; border-radius: 999px; background: rgba(21, 18, 43, 0.75);
+  .lado { position: absolute; z-index: 899; bottom: 70px; padding: 2px 12px; border-radius: 999px; background: rgba(31, 26, 21, 0.78);
           color: #fff; font-size: 13px; pointer-events: none; }
 
-  .secao { max-width: 980px; margin: 0 auto; padding: 32px 32px 0; }
-  .secao > p, .secao li { max-width: 72ch; }
-  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-  .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 24px; }
+  /* ------------------------------------------------ Texto */
+  .secao { padding: 28px 32px 0; }
+  .secao > p, .secao li { max-width: 68ch; }
+  .dica { font-size: 13px; color: var(--texto-suave); }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 20px; }
   .cartao-texto h3:first-child { margin-top: 0; }
   .nota { font-size: 13px; color: var(--texto-suave); }
   figure { margin: 16px 0; }
   figure img { width: 100%; border-radius: 14px; }
   figcaption { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
+  .figura-matriz img { display: block; max-width: 560px; margin: 0 auto; background: #fff; }
 
-  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--fundo); }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--duna); vertical-align: top; }
   thead th { font-weight: 600; }
   td.num, th.num { text-align: right; }
   .rolagem { overflow-x: auto; }
+  .quadro { font-size: 14px; min-width: 600px; }
+  .quadro th[scope=row] { font-weight: 600; white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--fundo); }
+  .quadro th.projeto { color: var(--roxo); border-bottom: 2px solid var(--roxo); }
+  .quadro td.projeto { background: var(--superficie); font-weight: 600; }
+  .trabalhos { display: grid; gap: 8px; margin-top: 16px; }
+  .trabalhos summary { font: 600 16px var(--titulo); cursor: pointer; }
+  .trabalhos p { margin: 8px 0 0; font-size: 15px; }
+  .cita { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+  .balao { position: absolute; z-index: 6000; max-width: min(340px, calc(100vw - 16px)); background: var(--superficie);
+           color: var(--texto); border-radius: 14px; box-shadow: 0 4px 18px rgba(43, 36, 32, 0.22); padding: 12px 16px;
+           font-size: 13px; line-height: 1.45; opacity: 0; transform: translateY(4px);
+           transition: opacity 150ms var(--curva), transform 150ms var(--curva); }
+  .balao.visivel { opacity: 1; transform: none; }
+  .balao .botao-doi { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; background: var(--roxo);
+                      color: var(--sobre-acento); text-decoration: none; font-weight: 600; }
 
-  .passos { list-style: none; counter-reset: passo; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
-  .passos li { counter-increment: passo; background: var(--superficie); border-radius: 14px; padding: 16px; box-shadow: var(--sombra); }
-  .passos li::before { content: counter(passo); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 999px;
-                       background: var(--roxo); color: #fff; font: 600 14px var(--titulo); margin-bottom: 8px; }
+  .passos { list-style: none; counter-reset: passo; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .passos li { counter-increment: passo; background: var(--superficie); border-radius: 14px; padding: 14px 16px; box-shadow: var(--sombra); }
+  .passos li::before { content: counter(passo); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px;
+                       border: 2px solid var(--roxo); color: var(--roxo); font: 600 13px var(--titulo); margin-bottom: 8px; }
   .passos b { display: block; font-family: var(--titulo); }
   .passos span { font-size: 14px; color: var(--texto-suave); }
-  .formula { font-family: ui-monospace, monospace; font-size: 14px; }
+  .formula { font-family: ui-monospace, monospace; font-size: 13px; }
 
-  .barra-linha { display: grid; grid-template-columns: 150px 1fr 150px; align-items: center; gap: 8px; padding: 3px 0; font-size: 14px; }
-  .trilho { position: relative; height: 14px; border-radius: 999px; background: color-mix(in srgb, var(--duna) 35%, transparent); }
+  .barra-linha { display: grid; grid-template-columns: 130px 1fr 140px; align-items: center; gap: 8px; padding: 3px 0; font-size: 14px; }
+  .trilho { position: relative; height: 14px; border-radius: 999px; background: color-mix(in srgb, var(--duna) 45%, transparent); }
   .barra { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: left 200ms var(--curva), width 200ms var(--curva); }
   .bigode { position: absolute; top: 6px; height: 2px; background: var(--texto); opacity: 0.55; transition: left 200ms var(--curva), width 200ms var(--curva); }
   .zero { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--texto-suave); }
   .valor { text-align: right; color: var(--texto-suave); }
   .abas { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
+  .botao { font: 500 13px var(--corpo); border-radius: 999px; padding: 6px 16px; cursor: pointer; border: 2px solid var(--roxo);
+           background: transparent; color: var(--link); transition: background 200ms var(--curva), color 200ms var(--curva); }
+  .botao[aria-pressed=true] { background: var(--roxo); color: var(--sobre-acento); }
   .seletor { font: 500 14px var(--corpo); padding: 6px 12px; border-radius: 999px; border: 2px solid var(--roxo);
              background: var(--fundo); color: var(--texto); }
 
@@ -186,66 +221,45 @@
   .matriz tbody th { text-align: left; }
   .calor { background: rgba(var(--calor), calc(var(--a) * 0.9)); border-radius: 4px; }
   .calor.escura { color: #fff; }
-  @media (prefers-color-scheme: dark) { .calor.escura { color: #15122B; } }
+  @media (prefers-color-scheme: dark) { .calor.escura { color: #1F1A15; } }
 
-  .rodape { padding: 8px 32px 32px; font-size: 13px; color: var(--texto-suave); }
-  .rodape p { margin: 4px 0; max-width: 980px; }
+  .rodape { padding: 8px 32px 40px; font-size: 13px; color: var(--texto-suave); }
+  .rodape p { margin: 4px 0; }
 
-  @media (max-width: 700px) {
-    .topo { flex-direction: column; align-items: flex-start; padding: 16px; }
-    .topo h1 { font-size: 28px; }
-    .logos img { height: auto; width: 100%; max-width: 360px; }
+  @media (prefers-reduced-motion: reduce) {
+    .imagem-s2, .legenda li, .botao-play, .barra, .bigode, .menu a, .botao, .balao { transition: none; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 899px) {
+    html { scroll-padding-top: calc(var(--altura-mapa-celular) + 52px); }
+    .menu { top: var(--altura-mapa-celular); }
     .menu ul { padding: 8px 16px; }
-    .numeros { padding: 16px; gap: 8px; }
-    .cartao { flex: 1 1 140px; min-width: 0; padding: 8px 16px; }
-    .cartao b { font-size: 28px; }
-    .area-mapa { margin: 0; border-radius: 0; height: 75vh; }
-    .legenda { left: 8px; right: 8px; bottom: 8px; max-width: none; }
-    .controles { left: 8px; top: 8px; }
+    .topo { padding: 16px 16px 8px; }
+    .topo h1 { font-size: 26px; }
+    .logos img { height: auto; width: 100%; max-width: 340px; }
     .secao { padding: 24px 16px 0; }
-    .barra-linha { grid-template-columns: 100px 1fr 96px; font-size: 13px; }
-    .rodape { padding: 8px 16px 24px; }
+    .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .cartao { padding: 10px 14px; }
+    .cartao b { font-size: 26px; }
+    .controles { left: 8px; top: 8px; }
+    .legenda { left: 8px; bottom: 8px; max-width: calc(100% - 140px); }
+    .legenda-indice { left: 8px; bottom: 8px; width: auto; max-width: calc(100% - 140px); }
+    .coluna-mapa.tela-cheia .legenda { max-width: 260px; }
+    .barra-linha { grid-template-columns: 96px 1fr 96px; font-size: 13px; }
+    .rodape { padding: 8px 16px 32px; }
   }
 </style>
 </head>
 <body>
-<header class="topo">
-  <div>
-    <p class="sobre">Future Tech Leaders Brasil · Space Tech Bootcamp 2026</p>
-    <h1>Areais da ottobacia Miracatu-Taquari<span class="selo">2025</span></h1>
-    <p class="sub">Mapeamento de áreas de arenização com Sentinel-2 e Random Forest · Franqueline Monback Noschang</p>
-  </div>
-  <div class="logos"><img src="logos_parceiros.png" alt="Future Tech Leaders, Agência Espacial Brasileira, SDG AI Lab, ICPSD e PNUD"></div>
-</header>
-<svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
-<nav class="menu" aria-label="Seções">
-  <ul>
-    <li><a href="#mapa-secao">Mapa</a></li>
-    <li><a href="#contexto">Contexto</a></li>
-    <li><a href="#dados">Dados</a></li>
-    <li><a href="#metodo">Método</a></li>
-    <li><a href="#resultados">Resultados</a></li>
-    <li><a href="#validacao">Validação</a></li>
-    <li><a href="#comparacao">Comparação</a></li>
-    <li><a href="#limitacoes">Limitações</a></li>
-    <li><a href="#referencias">Referências</a></li>
-  </ul>
-</nav>
-
-<section id="mapa-secao" aria-label="Mapa e números principais">
-  <div class="numeros">
-    <div class="cartao"><b data-valor="29.47" data-casas="2">29,47</b><span>km² de areal</span></div>
-    <div class="cartao"><b data-valor="5.0" data-casas="1" data-sufixo="%">5,0%</b><span>da bacia (589 km²)</span></div>
-    <div class="cartao"><b data-valor="0.88" data-casas="2">0,88</b><span>F1 do Areal no teste</span>
-      <small class="explica">F1: equilíbrio entre encontrar os areais e não marcar areal onde não existe (de 0 a 1).</small></div>
-    <div class="cartao"><b data-valor="0.90" data-casas="2">0,90</b><span>acurácia global no teste</span></div>
-  </div>
+<div class="story">
+<div class="coluna-mapa" id="coluna-mapa">
   <div class="area-mapa">
-    <div id="mapa" aria-label="Mapa da classificação de cobertura da terra"></div>
+    <div id="mapa" aria-label="Mapa da classificação de cobertura da terra, que acompanha o texto"></div>
     <details class="painel controles" id="controles" open>
       <summary>Camadas e linha do tempo</summary>
       <div class="conteudo-controles">
       <label>Fundo<select class="seletor" id="fundo"><option value="s2">Sentinel-2 2025</option><option value="esri">Satélite de alta resolução (Esri)</option><option value="osm">OpenStreetMap</option></select></label>
+      <label >Índice espectral<select class="seletor" id="indice"><option value="">Nenhum (classes do mapa)</option><option value="ndvi">NDVI – medianas bimestrais</option><option value="ndwi">NDWI – medianas bimestrais</option><option value="bsi">BSI – medianas bimestrais</option><option value="freq">Frequência de solo exposto (2025)</option></select></label>
       <div id="ctrl-periodo" class="linha-tempo" hidden>
         <span>Período: <b id="rotulo-periodo" aria-live="polite"></b></span>
         <div class="tempo">
@@ -261,21 +275,64 @@
     </details>
     <input type="range" class="divisor" id="divisor" min="0" max="100" value="50" aria-label="Divisão entre os mapas" hidden>
     <div class="linha" id="linha" hidden></div>
-    <span class="lado" id="lado-esq" style="left: 16px" hidden>Este mapa</span>
-    <span class="lado" id="lado-dir" style="right: 16px" hidden></span>
+    <span class="lado" id="lado-esq" style="left: 12px" hidden>Este mapa</span>
+    <span class="lado" id="lado-dir" style="right: 12px" hidden></span>
     <details class="painel legenda" id="legenda" open>
       <summary>Legenda</summary>
       <ul><li class="item-classe" tabindex="0" data-classe="1" data-cor="#E4572E"><span class="cor" style="background:#E4572E"></span>Areal<span class="km">29,47 km²</span></li><li class="item-classe" tabindex="0" data-classe="2" data-cor="#A8C66C"><span class="cor" style="background:#A8C66C"></span>Campo<span class="km">223,07 km²</span></li><li class="item-classe" tabindex="0" data-classe="3" data-cor="#F2C14E"><span class="cor" style="background:#F2C14E"></span>Lavoura<span class="km">200,79 km²</span></li><li class="item-classe" tabindex="0" data-classe="4" data-cor="#7A5900"><span class="cor" style="background:#7A5900"></span>Silvicultura<span class="km">34,99 km²</span></li><li class="item-classe" tabindex="0" data-classe="5" data-cor="#2E86C1"><span class="cor" style="background:#2E86C1"></span>Água<span class="km">8,33 km²</span></li><li class="item-classe" tabindex="0" data-classe="6" data-cor="#2D6A4F"><span class="cor" style="background:#2D6A4F"></span>Vegetação Nativa<span class="km">92,53 km²</span></li><li id="leg-outras" hidden><span class="cor" style="background:#B9B4C7"></span>Outras classes do MapBiomas</li></ul>
     </details>
+    <div class="painel legenda-indice" id="legenda-indice" hidden aria-live="polite">
+      <b id="li-nome"></b><span class="li-periodo" id="li-periodo"></span>
+      <div class="barra-cor" id="li-barra"></div>
+      <div class="escala"><span id="li-min"></span><span id="li-max"></span></div>
+      <p id="li-significado"></p>
+      <p class="li-nota">Manchas de areal em contorno; clique numa delas para ver as curvas.</p>
+    </div>
+    <button type="button" class="botao-expandir" id="expandir" aria-expanded="false" aria-controls="coluna-mapa">Expandir mapa</button>
   </div>
-  <p class="dica">Para conferir o resultado, use o fundo <b>Sentinel-2 2025</b>, a mesma base da classificação, e
-  compare lado a lado com o MapBiomas ou com a imagem sem classes. Mova o <b>período da imagem</b> pelos bimestres: o
-  areal fica exposto o ano todo; a lavoura, só em parte dele. A partir do zoom 14, as manchas de areal ganham contorno
-  e mostram a área ao clicar.</p>
+</div>
+
+<main class="coluna-texto">
+<header class="topo">
+  <div>
+    <p class="sobre">Future Tech Leaders Brasil · Space Tech Bootcamp 2026</p>
+    <h1>Areais da ottobacia Miracatu-Taquari<span class="selo">2025</span></h1>
+    <p class="sub">Mapeamento de áreas de arenização com Sentinel-2 e Random Forest · Franqueline Monback Noschang</p>
+  </div>
+  <div class="logos"><img src="logos_parceiros.png" alt="Future Tech Leaders, Agência Espacial Brasileira, SDG AI Lab, ICPSD e PNUD"></div>
+</header>
+<svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
+<nav class="menu" aria-label="Seções">
+  <ul>
+    <li><a href="#mapa-secao">Início</a></li>
+    <li><a href="#contexto">Contexto</a></li>
+    <li><a href="#dados">Dados</a></li>
+    <li><a href="#metodo">Método</a></li>
+    <li><a href="#resultados">Resultados</a></li>
+    <li><a href="#validacao">Validação</a></li>
+    <li><a href="#comparacao">Comparação</a></li>
+    <li><a href="#limitacoes">Limitações</a></li>
+    <li><a href="#referencias">Referências</a></li>
+  </ul>
+</nav>
+
+<section class="secao" id="mapa-secao" aria-label="Números principais">
+  <div class="numeros">
+    <div class="cartao"><b data-valor="29.47" data-casas="2">29,47</b><span>km² de areal</span></div>
+    <div class="cartao"><b data-valor="5.0" data-casas="1" data-sufixo="%">5,0%</b><span>da bacia (589 km²)</span></div>
+    <div class="cartao"><b data-valor="0.88" data-casas="2">0,88</b><span>F1 do Areal no teste</span>
+      <small class="explica">F1: equilíbrio entre encontrar os areais e não marcar areal onde não existe (de 0 a 1).</small></div>
+    <div class="cartao"><b data-valor="0.90" data-casas="2">0,90</b><span>acurácia global no teste</span></div>
+  </div>
+  <p class="dica"><b>O mapa acompanha o texto:</b> ao rolar, ele muda de camada e de enquadramento a cada seção. Se você
+  mexer no mapa, a condução automática pausa até a próxima seção. Para conferir o resultado, use o fundo
+  <b>Sentinel-2 2025</b>, mova o <b>período da imagem</b> pelos bimestres (o areal fica exposto o ano todo; a lavoura,
+  só em parte dele) e compare lado a lado com o MapBiomas. A partir do zoom 14, as manchas de areal ganham contorno e
+  mostram a área ao clicar.</p>
 </section>
 
 <section class="secao" id="contexto">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Contexto</h2>
   <p>A <b>arenização</b> é o principal processo de degradação do solo no Pampa gaúcho: em substratos arenosos frágeis,
   a perda da vegetação forma manchas de areia exposta, os <b>areais</b>. Os mapeamentos existentes usam imagens de 30 m
@@ -356,7 +413,7 @@
 </section>
 
 <section class="secao" id="dados">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Dados</h2>
   <div class="rolagem"><table>
     <thead><tr><th>Dado</th><th>Fonte</th><th>Uso</th></tr></thead>
@@ -365,7 +422,7 @@
       <tr><td>Cloud Score+</td><td>Google, via Earth Engine</td><td>Máscara de nuvens</td></tr>
       <tr><td>Limite da ottobacia 682636</td><td>ANA – Base Hidrográfica Ottocodificada</td><td>Recorte da área de estudo</td></tr>
       <tr><td>MapBiomas 10 m, Coleção 4</td><td>MapBiomas</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
-      <tr><td>Mapeamento de areais do RS</td><td>SEMA-RS</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
+      <tr><td>Mapeamento de areais do RS (2020)</td><td>SEMA-RS</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
       <tr><td>Amostras rotuladas (polígonos)</td><td>Interpretação visual neste projeto</td><td>Treino e teste</td></tr>
     </tbody>
   </table></div>
@@ -374,7 +431,7 @@
 </section>
 
 <section class="secao" id="metodo">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Método</h2>
   <ol class="passos">
     <li><b>Imagens</b><span>Todas as cenas Sentinel-2 de 2025 sobre a bacia, com nuvens mascaradas pelo Cloud Score+.</span></li>
@@ -392,6 +449,9 @@
   O gráfico mostra a mediana de cada classe nas amostras (barra) e o intervalo entre os quartis 25% e 75% (traço).</p>
   <div class="abas" id="abas-assinatura" role="tablist" aria-label="Variável"></div>
   <div id="grafico-assinatura"></div>
+  <p class="nota">Clique numa aba para ver o índice correspondente no mapa, como medianas bimestrais de 2025 (a
+  frequência de solo exposto é a mesma variável do modelo). No mapa, clique numa mancha de areal para comparar as
+  suas curvas com as de Lavoura e Campo.</p>
 
   <h3>Índices</h3>
   <div class="grade">
@@ -422,7 +482,7 @@
 </section>
 
 <section class="secao" id="resultados">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Resultados</h2>
   <p>O mapa identificou <b>29,47 km² de areal</b>, 5,0% da bacia. Campo e lavoura dominam a paisagem.</p>
   <div class="cartao-texto"><div class="barra-linha"><span>Areal</span><span class="trilho"><span class="barra" style="width:13.2%;background:#E4572E"></span></span><span class="valor">29,47 km² · 5,0%</span></div><div class="barra-linha"><span>Campo</span><span class="trilho"><span class="barra" style="width:100.0%;background:#A8C66C"></span></span><span class="valor">223,07 km² · 37,9%</span></div><div class="barra-linha"><span>Lavoura</span><span class="trilho"><span class="barra" style="width:90.0%;background:#F2C14E"></span></span><span class="valor">200,79 km² · 34,1%</span></div><div class="barra-linha"><span>Silvicultura</span><span class="trilho"><span class="barra" style="width:15.7%;background:#7A5900"></span></span><span class="valor">34,99 km² · 5,9%</span></div><div class="barra-linha"><span>Água</span><span class="trilho"><span class="barra" style="width:3.7%;background:#2E86C1"></span></span><span class="valor">8,33 km² · 1,4%</span></div><div class="barra-linha"><span>Vegetação Nativa</span><span class="trilho"><span class="barra" style="width:41.5%;background:#2D6A4F"></span></span><span class="valor">92,53 km² · 15,7%</span></div></div>
@@ -437,7 +497,7 @@
 </section>
 
 <section class="secao" id="validacao">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Validação</h2>
   <p>Acurácia global de <b>0,90</b> e F1 macro de <b>0,90</b> nos pontos de teste (do mapa do Earth Engine),
   que ficam em polígonos separados dos de treino. O F1 do Areal é <b>0,88</b>; a classe mais difícil é o Campo, que se
@@ -457,12 +517,12 @@
 </section>
 
 <section class="secao" id="comparacao">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Comparação com o MapBiomas e a SEMA-RS</h2>
   <p>A concordância geral com o MapBiomas 10 m é de <b>79,3%</b> da área da bacia. No Areal, a concordância
   é menor, e parte da diferença vem de como cada base classifica: o MapBiomas classifica o <b>uso</b> da terra (um talhão inteiro é lavoura,
   mesmo com uma mancha de areia dentro) e a SEMA-RS mapeou os areais consolidados, em escala mais grosseira. Este mapa
-  classifica a <b>cobertura</b> pixel a pixel, a 10 m.</p>
+  classifica a <b>cobertura</b> pixel a pixel, a 10 m. Nesta seção, o mapa mostra de perto a maior mancha de areal sobre lavoura do MapBiomas (63,7 ha), lado a lado com o MapBiomas.</p>
   <div class="cartao-texto">
     <h3>Onde está o Areal deste mapa, segundo o MapBiomas</h3>
     <div class="empilhada" role="img" aria-label="Areal deste mapa nas classes do MapBiomas"><span style="width:46.13%;background:#E4572E" title="Praia, duna e areal: 13,59 km² (46,1%)"></span><span style="width:7.38%;background:#8E7F6A" title="Outras áreas não vegetadas: 2,17 km² (7,4%)"></span><span style="width:10.39%;background:#B9B4C7" title="Mosaico de usos: 3,06 km² (10,4%)"></span><span style="width:27.90%;background:#F2C14E" title="Lavoura: 8,22 km² (27,9%)"></span><span style="width:4.27%;background:#A8C66C" title="Campo e pastagem: 1,26 km² (4,3%)"></span><span style="width:3.89%;background:#2D6A4F" title="Floresta e silvicultura: 1,15 km² (3,9%)"></span><span style="width:0.04%;background:#2E86C1" title="Água e áreas alagadas: 0,01 km² (0,0%)"></span></div><ul class="legenda-empilhada"><li><span class="cor" style="background:#E4572E"></span>Praia, duna e areal<b>46%</b></li><li><span class="cor" style="background:#8E7F6A"></span>Outras áreas não vegetadas<b>7%</b></li><li><span class="cor" style="background:#B9B4C7"></span>Mosaico de usos<b>10%</b></li><li><span class="cor" style="background:#F2C14E"></span>Lavoura<b>28%</b></li><li><span class="cor" style="background:#A8C66C"></span>Campo e pastagem<b>4%</b></li><li><span class="cor" style="background:#2D6A4F"></span>Floresta e silvicultura<b>4%</b></li><li><span class="cor" style="background:#2E86C1"></span>Água e áreas alagadas<b>&lt;1%</b></li></ul>
@@ -490,7 +550,7 @@
         <div class="empilhada" role="img" aria-label="Areal deste mapa dentro e fora dos areais da SEMA"><span style="width:38.41%;background:#E4572E" title="Dentro dos areais da SEMA: 11,32 km² (38,4%)"></span><span style="width:61.59%;background:#F1B9A6" title="Fora dos areais da SEMA: 18,15 km² (61,6%)"></span></div><ul class="legenda-empilhada"><li><span class="cor" style="background:#E4572E"></span>Dentro dos areais da SEMA<b>38%</b></li><li><span class="cor" style="background:#F1B9A6"></span>Fora dos areais da SEMA<b>62%</b></li></ul>
         <h3>Como este mapa classifica os 28,36 km² de areais da SEMA-RS</h3>
         <div class="empilhada" role="img" aria-label="Classes deste mapa dentro dos areais da SEMA"><span style="width:39.92%;background:#E4572E" title="Areal: 11,32 km² (39,9%)"></span><span style="width:39.06%;background:#A8C66C" title="Campo: 11,08 km² (39,1%)"></span><span style="width:18.85%;background:#F2C14E" title="Lavoura: 5,34 km² (18,8%)"></span><span style="width:1.20%;background:#7A5900" title="Silvicultura: 0,34 km² (1,2%)"></span><span style="width:0.88%;background:#2E86C1" title="Água: 0,25 km² (0,9%)"></span><span style="width:0.10%;background:#2D6A4F" title="Vegetação Nativa: 0,03 km² (0,1%)"></span></div><ul class="legenda-empilhada"><li><span class="cor" style="background:#E4572E"></span>Areal<b>40%</b></li><li><span class="cor" style="background:#A8C66C"></span>Campo<b>39%</b></li><li><span class="cor" style="background:#F2C14E"></span>Lavoura<b>19%</b></li><li><span class="cor" style="background:#7A5900"></span>Silvicultura<b>1%</b></li><li><span class="cor" style="background:#2E86C1"></span>Água<b>&lt;1%</b></li><li><span class="cor" style="background:#2D6A4F"></span>Vegetação Nativa<b>&lt;1%</b></li></ul>
-        <p class="nota">Parte dos areais da SEMA aparece como Campo: são áreas revegetadas desde o mapeamento
+        <p class="nota">Parte dos areais da SEMA (mapeamento de 2020) aparece como Campo em 2025: são áreas revegetadas desde o mapeamento
         ou areais com cobertura rala. A conferência visual separa os dois casos.</p>
       </div>
   <h3>Matriz de concordância</h3>
@@ -500,7 +560,7 @@
 </section>
 
 <section class="secao" id="limitacoes">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Limitações e próximos passos</h2>
   <ul>
     <li>A acurácia vem de amostras em áreas típicas de cada classe, sem verificação de campo. Uma amostra aleatória
@@ -521,13 +581,13 @@
 </section>
 
 <section class="secao" id="referencias">
-  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+  <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Referências</h2>
   <ul class="nota">
     <li>MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Disponível em: brasil.mapbiomas.org.</li>
     <li id="ref-olofsson2014" data-doi="10.1016/j.rse.2014.02.015">OLOFSSON, P. et al. Good practices for estimating area and assessing accuracy of land change. <i>Remote Sensing of Environment</i>, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.</li>
     <li id="ref-rayne2023" data-doi="10.1038/s41598-023-46319-1">RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. <i>Scientific Reports</i>, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.</li>
-    <li>RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul.</li>
+    <li>RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul. 2020. Disponível em: https://sema.rs.gov.br/areais.</li>
     <li id="ref-souza2017" data-doi="10.20502/rbg.v18i1.1051">SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. <i>Revista Brasileira de Geomorfologia</i>, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.</li>
     <li id="ref-suertegaray1992">SUERTEGARAY, D. M. A. <i>Deserto Grande do Sul: controvérsia</i>. Porto Alegre: Editora da UFRGS, 1992.</li>
     <li id="ref-suertegaray2011">SUERTEGARAY, D. M. A. Erosão nos campos sulinos: arenização no sudoeste do Rio Grande do Sul. <i>Revista Brasileira de Geomorfologia</i>, v. 12, n. 3, p. 61–74, 2011.</li>
@@ -541,15 +601,17 @@
   coleta e a conferência das amostras são da autora.</p>
 </section>
 
-<svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q75 3 150 12 T300 12 T450 12 T600 12 T750 12 T900 12 T1050 12 T1200 12"/></svg>
+<svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
 <footer class="rodape">
   <p>Fontes: imagens Sentinel-2 (ESA/Copernicus), Cloud Score+ (Google), MapBiomas 10 m, mapeamento de areais da SEMA-RS e
   ottobacias da ANA. Código sob licença MIT; dados produzidos no projeto sob CC BY 4.0.</p>
   <p><a href="https://github.com/Franquinoschang/arenizacao-pampa">Código, dados e metodologia completa no GitHub</a></p>
 </footer>
+</main>
+</div>
 
 <script>
-const DADOS = {"assinatura": {"classes": [{"nome": "Areal", "cor": "#E4572E"}, {"nome": "Lavoura exposta", "cor": "#C99A3B"}, {"nome": "Lavoura", "cor": "#F2C14E"}, {"nome": "Campo", "cor": "#A8C66C"}, {"nome": "Vegetação Nativa", "cor": "#2D6A4F"}, {"nome": "Silvicultura", "cor": "#7A5900"}, {"nome": "Água", "cor": "#2E86C1"}], "variaveis": {"FREQ_EXPOSTO": "Frequência de solo exposto", "NDVI_medio": "NDVI médio", "NDVI_amp": "Amplitude do NDVI", "NDVI_min": "NDVI mínimo", "BSI_med": "BSI mediano"}, "valores": {"FREQ_EXPOSTO": [[0.282609, 0.5, 0.932906], [0.130435, 0.208333, 0.288889], [0.061224, 0.130435, 0.192308], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0825, 0.229167, 0.396875]], "NDVI_medio": [[0.202215, 0.26419, 0.323317], [0.364387, 0.406398, 0.45989], [0.459724, 0.509304, 0.565368], [0.494047, 0.590048, 0.652172], [0.826087, 0.845033, 0.862765], [0.794658, 0.849605, 0.881856], [-0.0939, 0.064708, 0.261439]], "NDVI_amp": [[0.123481, 0.218123, 0.396908], [0.495016, 0.579903, 0.6576], [0.586891, 0.664113, 0.718326], [0.340063, 0.390012, 0.445054], [0.44309, 0.467242, 0.491517], [0.42849, 0.458676, 0.501134], [0.548044, 0.670696, 0.81813]], "NDVI_min": [[0.132498, 0.154517, 0.177853], [0.152866, 0.169141, 0.188801], [0.158777, 0.182741, 0.213033], [0.265659, 0.345516, 0.395469], [0.417201, 0.444853, 0.476217], [0.416547, 0.47747, 0.508399], [-0.438336, -0.337631, -0.122706]], "BSI_med": [[0.185333, 0.218773, 0.244102], [0.096788, 0.136092, 0.169367], [-0.041846, 0.032884, 0.091428], [-0.075442, -0.01144, 0.070416], [-0.344928, -0.31638, -0.280338], [-0.471492, -0.406709, -0.315823], [0.020004, 0.110231, 0.196912]]}}, "metricas": {"ee": {"linhas": [{"classe": "Areal", "precisao": 0.879121, "recall": 0.888889, "f1": 0.883978, "n": 180}, {"classe": "Campo", "precisao": 0.709845, "recall": 0.761111, "f1": 0.734584, "n": 180}, {"classe": "Lavoura", "precisao": 0.892958, "recall": 0.880556, "f1": 0.886713, "n": 360}, {"classe": "Silvicultura", "precisao": 1.0, "recall": 0.966667, "f1": 0.983051, "n": 180}, {"classe": "Água", "precisao": 0.982353, "recall": 0.927778, "f1": 0.954286, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.946237, "recall": 0.977778, "f1": 0.961749, "n": 180}], "acuracia": 0.897619, "f1_macro": 0.900727}, "mapa": {"linhas": [{"classe": "Areal", "precisao": 0.867021, "recall": 0.905556, "f1": 0.88587, "n": 180}, {"classe": "Campo", "precisao": 0.687179, "recall": 0.744444, "f1": 0.714667, "n": 180}, {"classe": "Lavoura", "precisao": 0.893372, "recall": 0.861111, "f1": 0.876945, "n": 360}, {"classe": "Silvicultura", "precisao": 0.965714, "recall": 0.938889, "f1": 0.952113, "n": 180}, {"classe": "Água", "precisao": 0.971429, "recall": 0.944444, "f1": 0.957746, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.955556, "recall": 0.955556, "f1": 0.955556, "n": 180}], "acuracia": 0.887302, "f1_macro": 0.890483}, "treino": {"linhas": [{"classe": "Areal", "precisao": 0.867021, "recall": 0.905556, "f1": 0.88587, "n": 180}, {"classe": "Campo", "precisao": 0.687179, "recall": 0.744444, "f1": 0.714667, "n": 180}, {"classe": "Lavoura", "precisao": 0.671875, "recall": 0.716667, "f1": 0.693548, "n": 180}, {"classe": "Silvicultura", "precisao": 0.965714, "recall": 0.938889, "f1": 0.952113, "n": 180}, {"classe": "Água", "precisao": 0.971429, "recall": 0.944444, "f1": 0.957746, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.955556, "recall": 0.955556, "f1": 0.955556, "n": 180}, {"classe": "Lavoura exposta", "precisao": 0.658065, "recall": 0.566667, "f1": 0.608955, "n": 180}], "acuracia": 0.824603, "f1_macro": 0.824065}}, "importancia": {"variaveis": ["B4_med", "B11_med", "NDWI_med", "NDVI_medio", "NDVI_desvio", "B12_med", "NDVI_amp", "B3_med", "BSI_med", "NDVI_min", "B8_med", "FREQ_EXPOSTO", "B2_med", "NDVI_max"], "classes": ["Areal", "Campo", "Lavoura", "Silvicultura", "Água", "Vegetação Nativa", "Lavoura exposta", "Média"], "valores": {"Areal": [0.005507, 0.022993, 0.010989, 0.025652, 0.011222, 0.009648, 0.004057, 0.001344, 0.013689, 0.006026, 0.011663, 0.007032, 0.0046, 0.000842], "Campo": [0.00359, -0.008273, 0.005681, 0.011735, 0.01437, 0.002231, 0.012786, 0.00219, 0.000309, -0.007766, -0.005904, -0.012189, -0.00957, -0.00498], "Lavoura": [0.020256, 0.016248, 0.013981, 0.009563, 0.029336, 0.010477, 0.019512, -0.000786, -0.00896, 0.000678, 0.003733, -0.013972, -0.003872, 0.002349], "Silvicultura": [0.207639, -0.003729, 0.083276, 0.035979, 0.028205, 0.008255, 0.003872, 0.038053, -0.003252, -0.005001, -0.002689, 0.005348, -0.006179, -0.006636], "Água": [0.002157, 0.146277, 0.001112, -0.001905, -0.001025, -0.002808, 0.001475, -0.000698, 0.001038, -0.002759, 0.007689, 0.001769, 0.000186, 0.001351], "Vegetação Nativa": [0.316419, 0.000702, 0.05463, 0.032534, 0.003953, 0.008092, 0.007348, 0.025046, 0.00341, 0.003728, 0.001009, 0.003434, 0.004593, -0.003717], "Lavoura exposta": [0.022575, 0.00965, 0.000581, 0.028525, 0.011728, 0.033006, 0.002261, -0.026421, 0.012826, 0.021278, -0.006821, -0.001648, -0.001856, -0.008511], "Média": [0.082592, 0.026267, 0.024321, 0.020298, 0.01397, 0.009843, 0.00733, 0.005533, 0.002723, 0.002312, 0.00124, -0.001461, -0.001728, -0.002757]}}};
+const DADOS = {"assinatura": {"classes": [{"nome": "Areal", "cor": "#E4572E"}, {"nome": "Lavoura exposta", "cor": "#C99A3B"}, {"nome": "Lavoura", "cor": "#F2C14E"}, {"nome": "Campo", "cor": "#A8C66C"}, {"nome": "Vegetação Nativa", "cor": "#2D6A4F"}, {"nome": "Silvicultura", "cor": "#7A5900"}, {"nome": "Água", "cor": "#2E86C1"}], "variaveis": {"FREQ_EXPOSTO": "Frequência de solo exposto", "NDVI_medio": "NDVI médio", "NDVI_amp": "Amplitude do NDVI", "NDVI_min": "NDVI mínimo", "BSI_med": "BSI mediano", "NDWI_med": "NDWI mediano"}, "valores": {"FREQ_EXPOSTO": [[0.282609, 0.5, 0.932906], [0.130435, 0.208333, 0.288889], [0.061224, 0.130435, 0.192308], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0825, 0.229167, 0.396875]], "NDVI_medio": [[0.202215, 0.26419, 0.323317], [0.364387, 0.406398, 0.45989], [0.459724, 0.509304, 0.565368], [0.494047, 0.590048, 0.652172], [0.826087, 0.845033, 0.862765], [0.794658, 0.849605, 0.881856], [-0.0939, 0.064708, 0.261439]], "NDVI_amp": [[0.123481, 0.218123, 0.396908], [0.495016, 0.579903, 0.6576], [0.586891, 0.664113, 0.718326], [0.340063, 0.390012, 0.445054], [0.44309, 0.467242, 0.491517], [0.42849, 0.458676, 0.501134], [0.548044, 0.670696, 0.81813]], "NDVI_min": [[0.132498, 0.154517, 0.177853], [0.152866, 0.169141, 0.188801], [0.158777, 0.182741, 0.213033], [0.265659, 0.345516, 0.395469], [0.417201, 0.444853, 0.476217], [0.416547, 0.47747, 0.508399], [-0.438336, -0.337631, -0.122706]], "BSI_med": [[0.185333, 0.218773, 0.244102], [0.096788, 0.136092, 0.169367], [-0.041846, 0.032884, 0.091428], [-0.075442, -0.01144, 0.070416], [-0.344928, -0.31638, -0.280338], [-0.471492, -0.406709, -0.315823], [0.020004, 0.110231, 0.196912]], "NDWI_med": [[-0.510706, -0.486928, -0.459414], [-0.537933, -0.514099, -0.492646], [-0.584308, -0.554097, -0.528298], [-0.635981, -0.600467, -0.548859], [-0.785432, -0.770016, -0.754449], [-0.846845, -0.826285, -0.801963], [-0.334384, -0.124802, 0.067652]]}}, "metricas": {"ee": {"linhas": [{"classe": "Areal", "precisao": 0.879121, "recall": 0.888889, "f1": 0.883978, "n": 180}, {"classe": "Campo", "precisao": 0.709845, "recall": 0.761111, "f1": 0.734584, "n": 180}, {"classe": "Lavoura", "precisao": 0.892958, "recall": 0.880556, "f1": 0.886713, "n": 360}, {"classe": "Silvicultura", "precisao": 1.0, "recall": 0.966667, "f1": 0.983051, "n": 180}, {"classe": "Água", "precisao": 0.982353, "recall": 0.927778, "f1": 0.954286, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.946237, "recall": 0.977778, "f1": 0.961749, "n": 180}], "acuracia": 0.897619, "f1_macro": 0.900727}, "mapa": {"linhas": [{"classe": "Areal", "precisao": 0.867021, "recall": 0.905556, "f1": 0.88587, "n": 180}, {"classe": "Campo", "precisao": 0.687179, "recall": 0.744444, "f1": 0.714667, "n": 180}, {"classe": "Lavoura", "precisao": 0.893372, "recall": 0.861111, "f1": 0.876945, "n": 360}, {"classe": "Silvicultura", "precisao": 0.965714, "recall": 0.938889, "f1": 0.952113, "n": 180}, {"classe": "Água", "precisao": 0.971429, "recall": 0.944444, "f1": 0.957746, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.955556, "recall": 0.955556, "f1": 0.955556, "n": 180}], "acuracia": 0.887302, "f1_macro": 0.890483}, "treino": {"linhas": [{"classe": "Areal", "precisao": 0.867021, "recall": 0.905556, "f1": 0.88587, "n": 180}, {"classe": "Campo", "precisao": 0.687179, "recall": 0.744444, "f1": 0.714667, "n": 180}, {"classe": "Lavoura", "precisao": 0.671875, "recall": 0.716667, "f1": 0.693548, "n": 180}, {"classe": "Silvicultura", "precisao": 0.965714, "recall": 0.938889, "f1": 0.952113, "n": 180}, {"classe": "Água", "precisao": 0.971429, "recall": 0.944444, "f1": 0.957746, "n": 180}, {"classe": "Vegetação Nativa", "precisao": 0.955556, "recall": 0.955556, "f1": 0.955556, "n": 180}, {"classe": "Lavoura exposta", "precisao": 0.658065, "recall": 0.566667, "f1": 0.608955, "n": 180}], "acuracia": 0.824603, "f1_macro": 0.824065}}, "importancia": {"variaveis": ["B4_med", "B11_med", "NDWI_med", "NDVI_medio", "NDVI_desvio", "B12_med", "NDVI_amp", "B3_med", "BSI_med", "NDVI_min", "B8_med", "FREQ_EXPOSTO", "B2_med", "NDVI_max"], "classes": ["Areal", "Campo", "Lavoura", "Silvicultura", "Água", "Vegetação Nativa", "Lavoura exposta", "Média"], "valores": {"Areal": [0.005507, 0.022993, 0.010989, 0.025652, 0.011222, 0.009648, 0.004057, 0.001344, 0.013689, 0.006026, 0.011663, 0.007032, 0.0046, 0.000842], "Campo": [0.00359, -0.008273, 0.005681, 0.011735, 0.01437, 0.002231, 0.012786, 0.00219, 0.000309, -0.007766, -0.005904, -0.012189, -0.00957, -0.00498], "Lavoura": [0.020256, 0.016248, 0.013981, 0.009563, 0.029336, 0.010477, 0.019512, -0.000786, -0.00896, 0.000678, 0.003733, -0.013972, -0.003872, 0.002349], "Silvicultura": [0.207639, -0.003729, 0.083276, 0.035979, 0.028205, 0.008255, 0.003872, 0.038053, -0.003252, -0.005001, -0.002689, 0.005348, -0.006179, -0.006636], "Água": [0.002157, 0.146277, 0.001112, -0.001905, -0.001025, -0.002808, 0.001475, -0.000698, 0.001038, -0.002759, 0.007689, 0.001769, 0.000186, 0.001351], "Vegetação Nativa": [0.316419, 0.000702, 0.05463, 0.032534, 0.003953, 0.008092, 0.007348, 0.025046, 0.00341, 0.003728, 0.001009, 0.003434, 0.004593, -0.003717], "Lavoura exposta": [0.022575, 0.00965, 0.000581, 0.028525, 0.011728, 0.033006, 0.002261, -0.026421, 0.012826, 0.021278, -0.006821, -0.001648, -0.001856, -0.008511], "Média": [0.082592, 0.026267, 0.024321, 0.020298, 0.01397, 0.009843, 0.00733, 0.005533, 0.002723, 0.002312, 0.00124, -0.001461, -0.001728, -0.002757]}}};
 const fmt = (v, c = 2) => v.toLocaleString("pt-BR", { minimumFractionDigits: c, maximumFractionDigits: c });
 
 // ---------------------------------------------------------------- Mapa
@@ -569,6 +631,20 @@ const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZ
 // Linha do tempo Sentinel-2: [arquivo, rótulo], a mediana do ano primeiro e depois os bimestres.
 // Duas camadas se alternam para a sobreposição cruzada; cada WebP só é baixado quando é exibido.
 const PERIODOS = [["sentinel2_2025.webp", "ano 2025 (mediana)"], ["sentinel2_2025_01.webp", "jan–fev"], ["sentinel2_2025_02.webp", "mar–abr"], ["sentinel2_2025_03.webp", "mai–jun"], ["sentinel2_2025_04.webp", "jul–ago"], ["sentinel2_2025_05.webp", "set–out"], ["sentinel2_2025_06.webp", "nov–dez"]];
+// Índices espectrais da pilha bimestral: arquivos por período (posição 0 = ano; vazia nos índices bimestrais)
+const INDICES = {"ndvi": {"rotulo": "NDVI – medianas bimestrais", "min": -0.2, "max": 0.9, "arquivos": [null, "indice_ndvi_2025_01.webp", "indice_ndvi_2025_02.webp", "indice_ndvi_2025_03.webp", "indice_ndvi_2025_04.webp", "indice_ndvi_2025_05.webp", "indice_ndvi_2025_06.webp"], "anual": false, "contorno": "#FFFFFF", "significado": "Marrom: solo exposto ou vegetação rala. Verde: vegetação densa.", "gradiente": "linear-gradient(to right, #5b3a1f, #866442, #b59b7b, #e6dec7, #acc98a, #68a258, #1d6b32)", "grafico": [0.1, 0.7]}, "ndwi": {"rotulo": "NDWI – medianas bimestrais", "min": -0.6, "max": 0.6, "arquivos": [null, "indice_ndwi_2025_01.webp", "indice_ndwi_2025_02.webp", "indice_ndwi_2025_03.webp", "indice_ndwi_2025_04.webp", "indice_ndwi_2025_05.webp", "indice_ndwi_2025_06.webp"], "anual": false, "contorno": "#1A1A1A", "significado": "Branco: superfície seca ou vegetada. Azul: água e solo úmido.", "gradiente": "linear-gradient(to right, #ffffff, #d9e7f4, #a8cce7, #6aaed6, #3a85c0, #185b9c, #08306b)", "grafico": [-0.7, -0.2]}, "bsi": {"rotulo": "BSI – medianas bimestrais", "min": -0.6, "max": 0.6, "arquivos": [null, "indice_bsi_2025_01.webp", "indice_bsi_2025_02.webp", "indice_bsi_2025_03.webp", "indice_bsi_2025_04.webp", "indice_bsi_2025_05.webp", "indice_bsi_2025_06.webp"], "anual": false, "contorno": "#1A1A1A", "significado": "Azul-escuro: solo coberto por vegetação. Amarelo: solo exposto.", "gradiente": "linear-gradient(to right, #00224e, #2a3f6d, #575d6d, #7d7c78, #a59c74, #d2c060, #fee838)", "grafico": [-0.2, 0.4]}, "freq": {"rotulo": "Frequência de solo exposto (2025)", "min": 0.0, "max": 1.0, "arquivos": ["indice_freq_2025.webp"], "anual": true, "contorno": "#1A1A1A", "significado": "Fração das cenas do ano com solo exposto. Azul-escuro: nunca. Amarelo: em todas.", "gradiente": "linear-gradient(to right, #00224e, #2a3f6d, #575d6d, #7d7c78, #a59c74, #d2c060, #fee838)"}};
+const TIPICAS = {"Lavoura": {"ndvi": [0.554, 0.509, 0.529, 0.547, 0.507, 0.316], "ndwi": [-0.581, -0.545, -0.552, -0.575, -0.55, -0.456], "bsi": [-0.011, 0.067, 0.03, 0.02, 0.009, 0.158]}, "Campo": {"ndvi": [0.506, 0.709, 0.63, 0.521, 0.623, 0.637], "ndwi": [-0.548, -0.653, -0.641, -0.58, -0.601, -0.602], "bsi": [0.091, -0.081, -0.021, 0.077, -0.037, -0.034]}};   // curvas medianas de Lavoura e Campo nas amostras
+let indiceAtual = "";
+function urlPeriodo(i) {
+  const ind = INDICES[indiceAtual];
+  if (ind) return ind.anual ? ind.arquivos[0] : ind.arquivos[i];
+  return PERIODOS[i][0];
+}
+function rotuloDoPeriodo(i) {
+  const ind = INDICES[indiceAtual];
+  if (ind && ind.anual) return "ano 2025";
+  return PERIODOS.length ? PERIODOS[i][1] : "";
+}
 const VAZIO = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 const camadasS2 = PERIODOS.length ? [0, 1].map(() => L.imageOverlay(VAZIO, limites,
   { pane: "fundo", interactive: false, opacity: 0, className: "imagem-s2", attribution: "Sentinel-2: ESA/Copernicus" })) : [];
@@ -582,10 +658,12 @@ let visivel = 0, indicePeriodo = 0, pedidoPeriodo = 0, temporizador = null;
 function mostrarPeriodo(i) {
   indicePeriodo = i;
   periodo.value = i;
-  rotuloPeriodo.textContent = PERIODOS.length ? PERIODOS[i][1] : "";
+  rotuloPeriodo.textContent = rotuloDoPeriodo(i);
+  document.getElementById("li-periodo").textContent = rotuloDoPeriodo(i);
   if (!camadasS2.length || !mapa.hasLayer(camadasS2[0])) return;
   const atual = camadasS2[visivel], proxima = camadasS2[1 - visivel];
-  const url = new URL(PERIODOS[i][0], location.href).href;
+  const arquivo = urlPeriodo(i);
+  const url = new URL(arquivo, location.href).href;
   if (atual.getElement().src === url && atual.options.opacity > 0) return;
   const meu = ++pedidoPeriodo;
   const trocar = () => {
@@ -595,12 +673,12 @@ function mostrarPeriodo(i) {
     visivel = 1 - visivel;
   };
   if (proxima.getElement().src === url && proxima.getElement().complete) trocar();
-  else { proxima.once("load", trocar); proxima.setUrl(PERIODOS[i][0]); }
+  else { proxima.once("load", trocar); proxima.setUrl(arquivo); }
 }
 
 const precarregadas = new Set();
 function precarregar(i) {
-  const url = PERIODOS[i][0];
+  const url = urlPeriodo(i);
   if (!precarregadas.has(url)) { precarregadas.add(url); new Image().src = url; }
 }
 
@@ -610,7 +688,8 @@ function tocar(ligar) {
   botaoPlay.setAttribute("aria-pressed", ligar);
   botaoPlay.setAttribute("aria-label", ligar ? "Pausar a linha do tempo" : "Reproduzir a linha do tempo");
   if (!ligar) return;
-  const proximo = () => (indicePeriodo + 1) % PERIODOS.length;
+  // Nos índices bimestrais o play percorre só os bimestres (posições 1 a 6)
+  const proximo = () => (INDICES[indiceAtual] ? (indicePeriodo % (PERIODOS.length - 1)) + 1 : (indicePeriodo + 1) % PERIODOS.length);
   precarregar(proximo());
   temporizador = setInterval(() => {
     mostrarPeriodo(proximo());
@@ -625,14 +704,17 @@ function escolherFundo(chave) {
   tocar(false);
   [satelite, osm, ...camadasS2].forEach((c) => c.remove());
   camadasFundo[chave].forEach((c) => c.addTo(mapa));
-  ctrlPeriodo.hidden = chave !== "s2" || PERIODOS.length < 2;
+  ctrlPeriodo.hidden = chave !== "s2" || PERIODOS.length < 2 || !!(INDICES[indiceAtual] && INDICES[indiceAtual].anual);
   if (chave === "s2") {
     camadasS2.forEach((c) => c.setOpacity(0));
     mostrarPeriodo(indicePeriodo);
   }
 }
 const seletorFundo = document.getElementById("fundo");
-seletorFundo.addEventListener("change", () => escolherFundo(seletorFundo.value));
+seletorFundo.addEventListener("change", () => {
+  if (seletorFundo.value !== "s2" && indiceAtual) definirIndice("");
+  escolherFundo(seletorFundo.value);
+});
 escolherFundo(seletorFundo.value);
 const URL_CLASSES = "classes_2025.png";
 const classes = L.imageOverlay(URL_CLASSES, limites, { pane: "classes", opacity: 0.75 }).addTo(mapa);
@@ -642,7 +724,22 @@ const mapbiomas = true ? L.imageOverlay("mapbiomas_2025.png", limites, { pane: "
 const contornos = L.geoJSON(null, {
   pane: "areal",
   style: { color: "#8A2A12", weight: 0.5, fillOpacity: 0 },
-  onEachFeature: (f, camada) => camada.bindPopup("Areal: " + fmt(f.properties.area_ha) + " ha"),
+  onEachFeature: (f, camada) => {
+    camada.bindPopup(() => conteudoPopup(f.properties), { maxWidth: 300 });
+    camada.on("popupopen", (e) => {
+      // Abas NDVI / NDWI / BSI dentro do balão: troca só o gráfico, sem recriar o balão (o Leaflet fecharia o
+      // balão ao ver um clique num botão que saiu da página)
+      e.popup.getElement().onclick = (ev) => {
+        const b = ev.target.closest(".mini-aba");
+        if (!b) return;
+        L.DomEvent.stopPropagation(ev);
+        const caixa = b.closest(".popup-areal");
+        caixa.querySelectorAll(".mini-aba").forEach((o) => o.setAttribute("aria-pressed", o === b));
+        const serie = typeof f.properties.s === "string" ? JSON.parse(f.properties.s) : f.properties.s;
+        caixa.querySelector(".minigrafico").outerHTML = miniGrafico(serie, b.dataset.ind);
+      };
+    });
+  },
 });
 const bacia = L.geoJSON(null, { pane: "limite", interactive: false, style: { color: "#fff", weight: 2, fill: false } }).addTo(mapa);
 // Polígonos em arquivos separados (docs/), carregados depois do mapa
@@ -654,8 +751,79 @@ lerGeoJSON("bacia.geojson", bacia);
 lerGeoJSON("areais_2025.geojson", contornos);
 
 function atualizarContornos() {
-  if (mapa.getZoom() >= 14) contornos.addTo(mapa); else contornos.remove();
+  const ind = INDICES[indiceAtual];
+  contornos.setStyle(ind ? { color: ind.contorno, weight: 1, opacity: 0.9 } : { color: "#8A2A12", weight: 0.5, opacity: 1 });
+  if (ind || mapa.getZoom() >= 14) contornos.addTo(mapa); else contornos.remove();
 }
+
+// Minigráfico das medianas bimestrais de uma mancha de areal, com as curvas típicas de Lavoura e Campo
+const NOMES_INDICE = { ndvi: "NDVI", ndwi: "NDWI", bsi: "BSI" };
+const BIMESTRES_CURTOS = ["J–F", "M–A", "M–J", "J–A", "S–O", "N–D"];
+function miniGrafico(serie, nome) {
+  // Faixa do minigráfico: a mesma para todas as manchas, ajustada aos valores das manchas e das curvas típicas
+  const [gmin, gmax] = (INDICES[nome] && INDICES[nome].grafico) || [-1, 1];
+  const ind = { min: gmin, max: gmax };
+  const L = 260, A = 132, m = { e: 34, d: 8, t: 8, b: 22 };
+  const x = (i) => m.e + (i * (L - m.e - m.d)) / 5;
+  const y = (v) => m.t + (1 - (Math.min(Math.max(v, ind.min), ind.max) - ind.min) / (ind.max - ind.min)) * (A - m.t - m.b);
+  const linha = (vals, cor, tracejada) => (vals && vals.length === 6 && vals.every((v) => v !== null))
+    ? `<polyline fill="none" stroke="${cor}" stroke-width="${tracejada ? 1.8 : 2.8}" stroke-linejoin="round"${tracejada ? ' stroke-dasharray="4 3"' : ""} points="${vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"/>`
+    : "";
+  const marcas = [ind.min, (ind.min + ind.max) / 2, ind.max].map((v) =>
+    `<line x1="${m.e}" x2="${L - m.d}" y1="${y(v)}" y2="${y(v)}"/><text x="${m.e - 4}" y="${y(v) + 3}" text-anchor="end">${fmt(v, 1)}</text>`).join("");
+  const meses = BIMESTRES_CURTOS.map((r, i) => `<text x="${x(i)}" y="${A - 6}" text-anchor="middle">${r}</text>`).join("");
+  return `<svg class="minigrafico" viewBox="0 0 ${L} ${A}" role="img" aria-label="${NOMES_INDICE[nome]} por bimestre: esta mancha, Lavoura típica e Campo típico">`
+    + marcas + meses
+    + linha(TIPICAS.Campo && TIPICAS.Campo[nome], "#6E8F3A", true)
+    + linha(TIPICAS.Lavoura && TIPICAS.Lavoura[nome], "#B08A2E", true)
+    + linha(serie && serie[nome], "#E4572E", false) + "</svg>";
+}
+function conteudoPopup(props, nome) {
+  nome = nome || (NOMES_INDICE[indiceAtual] ? indiceAtual : "ndvi");
+  let corpo = `<b>Areal: ${fmt(props.area_ha)} ha</b>`;
+  const serie = typeof props.s === "string" ? JSON.parse(props.s) : props.s;
+  if (serie) {
+    corpo += `<div class="mini-abas">${Object.keys(NOMES_INDICE).map((k) =>
+      `<button type="button" class="mini-aba" data-ind="${k}" aria-pressed="${k === nome}">${NOMES_INDICE[k]}</button>`).join("")}</div>`
+      + miniGrafico(serie, nome)
+      + `<div class="mini-legenda"><span style="--cor:#E4572E">esta mancha</span>`
+      + `<span class="tracejada" style="--cor:#B08A2E">Lavoura típica</span><span class="tracejada" style="--cor:#6E8F3A">Campo típico</span></div>`
+      + `<small>Medianas bimestrais de 2025; Lavoura e Campo: mediana dos polígonos de amostra.</small>`;
+  }
+  return `<div class="popup-areal">${corpo}</div>`;
+}
+
+// Liga e desliga um índice espectral: fundo Sentinel-2, classes desligadas e manchas de areal só em contorno
+const seletorIndice = document.getElementById("indice");
+const legendaClasses = document.getElementById("legenda");
+const legendaIndice = document.getElementById("legenda-indice");
+function definirIndice(nome, restaurarClasses = true) {
+  if (!INDICES[nome]) nome = "";
+  indiceAtual = nome;
+  seletorIndice.value = nome;
+  const ind = INDICES[nome];
+  periodo.min = ind && !ind.anual ? 1 : 0;
+  if (ind && !ind.anual && indicePeriodo === 0) indicePeriodo = 1;
+  legendaIndice.hidden = !ind;
+  legendaClasses.hidden = !!ind;
+  if (ind) {
+    document.getElementById("li-nome").textContent = ind.rotulo;
+    document.getElementById("li-barra").style.background = ind.gradiente;
+    document.getElementById("li-min").textContent = fmt(ind.min, 1);
+    document.getElementById("li-max").textContent = fmt(ind.max, 1);
+    document.getElementById("li-significado").textContent = ind.significado;
+    classes.setOpacity(0);
+    areal.setOpacity(0);
+    if (seletorFundo.value !== "s2") { seletorFundo.value = "s2"; escolherFundo("s2"); }
+    else mostrarPeriodo(indicePeriodo);
+  } else {
+    if (restaurarClasses) destacar(classeFixa);
+    if (seletorFundo.value === "s2") mostrarPeriodo(indicePeriodo);
+  }
+  ctrlPeriodo.hidden = seletorFundo.value !== "s2" || PERIODOS.length < 2 || !!(ind && ind.anual);
+  atualizarContornos();
+}
+seletorIndice.addEventListener("change", () => definirIndice(seletorIndice.value));
 mapa.on("zoomend", atualizarContornos);
 atualizarContornos();
 
@@ -729,20 +897,22 @@ function recortar() {
   linha.style.left = pos + "px";
 }
 
-comparaCom.addEventListener("change", () => {
-  modo = comparaCom.value;
+function definirComparacao(novo) {
+  comparaCom.value = novo;
+  modo = novo;
   ["divisor", "linha", "lado-esq", "lado-dir"].forEach((id) => (document.getElementById(id).hidden = !modo));
   document.getElementById("leg-outras").hidden = modo !== "mapbiomas";
   document.getElementById("lado-dir").textContent =
     modo === "mapbiomas" ? "MapBiomas 10 m (2025)" : "Imagem de fundo";
   if (mapbiomas) { if (modo === "mapbiomas") mapbiomas.addTo(mapa); else mapbiomas.remove(); }
   recortar();
-});
+}
+comparaCom.addEventListener("change", () => definirComparacao(comparaCom.value));
 divisor.addEventListener("input", recortar);
 ["mousedown", "touchstart"].forEach((ev) => divisor.addEventListener(ev, () => mapa.dragging.disable()));
 ["mouseup", "touchend"].forEach((ev) => divisor.addEventListener(ev, () => mapa.dragging.enable()));
 mapa.on("move zoom resize", recortar);
-if (window.matchMedia("(max-width: 700px)").matches) {
+if (window.matchMedia("(max-width: 899px)").matches) {
   document.getElementById("legenda").open = false;
   document.getElementById("controles").open = false;
 }
@@ -810,7 +980,7 @@ function criarAbas(idContainer, opcoes, aoEscolher) {
   const caixa = document.getElementById(idContainer);
   const botoes = opcoes.map(([chave, rotulo], i) => {
     const b = document.createElement("button");
-    b.className = "botao"; b.type = "button"; b.textContent = rotulo;
+    b.className = "botao"; b.type = "button"; b.textContent = rotulo; b.dataset.chave = chave;
     b.setAttribute("role", "tab");
     b.addEventListener("click", () => {
       botoes.forEach((o) => o.setAttribute("aria-pressed", o === b));
@@ -840,6 +1010,13 @@ function desenharAssinatura(variavel) {
   }).join("");
 }
 criarAbas("abas-assinatura", Object.entries(DADOS.assinatura.variaveis), desenharAssinatura);
+// Clicar numa aba mostra no mapa o índice correspondente (só cliques de verdade, não a aba inicial)
+const VARIAVEL_INDICE = { FREQ_EXPOSTO: "freq", NDVI_medio: "ndvi", NDVI_amp: "ndvi", NDVI_min: "ndvi", BSI_med: "bsi", NDWI_med: "ndwi" };
+document.getElementById("abas-assinatura").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  const nome = b && VARIAVEL_INDICE[b.dataset.chave];
+  if (e.isTrusted && nome && INDICES[nome]) definirIndice(nome);
+});
 
 // ---------------------------------------------------------------- Métricas
 const rotulosMetricas = { ee: "Mapa publicado (Earth Engine)", mapa: "Modelo: classes do mapa", treino: "Modelo: classes do treino" };
@@ -871,13 +1048,91 @@ function desenharImportancia() {
 seletor.addEventListener("change", desenharImportancia);
 desenharImportancia();
 
-// ---------------------------------------------------------------- Menu: seção ativa
+// ---------------------------------------------------------------- Mapa em tela cheia (celular) e redimensionamento
+const colunaMapa = document.getElementById("coluna-mapa");
+const botaoExpandir = document.getElementById("expandir");
+let mapaAberto = false;
+const ajustarMapa = () => requestAnimationFrame(() => { mapa.invalidateSize(); recortar(); });
+botaoExpandir.addEventListener("click", () => {
+  mapaAberto = !mapaAberto;
+  colunaMapa.classList.toggle("tela-cheia", mapaAberto);
+  document.body.classList.toggle("mapa-aberto", mapaAberto);
+  botaoExpandir.textContent = mapaAberto ? "Fechar" : "Expandir mapa";
+  botaoExpandir.setAttribute("aria-expanded", mapaAberto);
+  ajustarMapa();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && mapaAberto) botaoExpandir.click(); });
+window.addEventListener("resize", ajustarMapa);
+
+// ---------------------------------------------------------------- Story map: o texto conduz o mapa
+const CASO = [[-29.53016440163214, -55.37995931598154], [-29.51747042309875, -55.359851325993475]];   // limites da maior mancha de areal sobre lavoura do MapBiomas (ou null)
+const semAnimacao = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const itemAreal = document.querySelector('.item-classe[data-classe="1"]');
+const CENAS = {
+  "mapa-secao": { fundo: "s2", classes: "todas" },
+  contexto: { fundo: "esri", classes: "nenhuma" },
+  dados: { fundo: "esri", classes: "nenhuma" },
+  metodo: { fundo: "s2", classes: "nenhuma", indice: "ndvi", play: true },
+  resultados: { fundo: "s2", classes: "todas" },
+  validacao: { fundo: "s2", classes: "areal" },
+  comparacao: { fundo: "s2", classes: "todas", comparar: "mapbiomas", vista: "caso" },
+  limitacoes: { fundo: "s2", classes: "nenhuma", indice: "ndwi" },
+  referencias: { fundo: "s2", classes: "todas" },
+};
+let movimentoAuto = false, secaoAtual = null, pausadaEm = null;
+
+function voar(alvo, zoomMaximo = 15) {
+  movimentoAuto = true;
+  if (semAnimacao) {
+    mapa.fitBounds(alvo, { animate: false, maxZoom: zoomMaximo });
+    movimentoAuto = false;
+    return;
+  }
+  mapa.once("moveend", () => (movimentoAuto = false));
+  mapa.flyToBounds(alvo, { duration: 1.2, maxZoom: zoomMaximo, padding: [24, 24] });
+}
+function mostrarClasses(estado) {
+  classeFixa = null;
+  if (estado === "areal" && itemAreal) { destacar(itemAreal); return; }
+  destacar(null);
+  if (estado === "nenhuma") { classes.setOpacity(0); areal.setOpacity(0); }
+}
+function aplicarCena(id) {
+  const cena = CENAS[id];
+  if (!cena) return;
+  const fundo = cena.fundo === "s2" && !PERIODOS.length ? "esri" : cena.fundo;
+  if (seletorFundo.value !== fundo) { seletorFundo.value = fundo; escolherFundo(fundo); }
+  definirComparacao(cena.comparar && mapbiomas ? cena.comparar : "");
+  definirIndice(cena.indice || "", false);
+  mostrarClasses(cena.classes);
+  tocar(!!cena.play && fundo === "s2" && PERIODOS.length > 1);
+  if (cena.vista === "caso" && CASO) voar(CASO, 14); else voar(limites);
+}
+
+// Interação manual pausa a condução até a próxima seção
+function pausarConducao() {
+  pausadaEm = secaoAtual;
+  if (movimentoAuto) { mapa.stop(); movimentoAuto = false; }
+}
+mapa.on("dragstart", pausarConducao);
+mapa.on("zoomstart", () => { if (!movimentoAuto) pausarConducao(); });
+const areaMapa = document.querySelector(".area-mapa");
+areaMapa.addEventListener("pointerdown", (e) => { if (e.target.closest(".controles, .legenda, .divisor")) pausarConducao(); });
+["input", "change"].forEach((ev) => areaMapa.addEventListener(ev, (e) => { if (e.isTrusted) pausarConducao(); }));
+
 const linksMenu = [...document.querySelectorAll(".menu a")];
+const ehCelular = window.matchMedia("(max-width: 899px)").matches;
 const observador = new IntersectionObserver((entradas) => {
   entradas.forEach((e) => {
-    if (e.isIntersecting) linksMenu.forEach((a) => a.classList.toggle("ativo", a.getAttribute("href") === "#" + e.target.id));
+    if (!e.isIntersecting) return;
+    const id = e.target.id;
+    linksMenu.forEach((a) => a.classList.toggle("ativo", a.getAttribute("href") === "#" + id));
+    if (id === secaoAtual) return;
+    secaoAtual = id;
+    if (pausadaEm && pausadaEm !== id) pausadaEm = null;
+    if (!pausadaEm && !mapaAberto) aplicarCena(id);
   });
-}, { rootMargin: "-40% 0px -55% 0px" });
+}, { rootMargin: ehCelular ? "-55% 0px -40% 0px" : "-35% 0px -60% 0px" });
 linksMenu.forEach((a) => observador.observe(document.querySelector(a.getAttribute("href"))));
 </script>
 </body>
