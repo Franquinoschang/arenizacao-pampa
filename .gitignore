@@ -9,6 +9,9 @@ __pycache__/
 # Segredos e configurações locais
 .env
 
+# Dados de terceiros (ver README)
+data/raw/Areais_area_estudo_SEMA/
+
 # Saídas grandes (ficam no Google Drive / Zenodo)
 data/processed/**/*.tif
 *.aux.xml
@@ -17,7 +20,7 @@ data/processed/**/*.tif
 *.ovr
 *.vat.cpg
 *.vat.dbf
-*.lock
+*.sr.lock
 *.sbn
 *.sbx
 
