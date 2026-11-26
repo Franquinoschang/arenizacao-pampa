@@ -38,6 +38,52 @@ VARIAVEIS_ASSINATURA = {
 }
 
 
+VARIAVEIS_TIPICAS = {"NDVI_medio": "NDVI médio", "NDWI_med": "NDWI mediano", "BSI_med": "BSI mediano",
+                     "FREQ_EXPOSTO": "Frequência de solo exposto"}
+
+# Cartões "Como ler os índices" (chave = índice da camada de fundo no mapa)
+CARTOES_INDICES = [
+    ("ndvi", "NDVI", "Índice de Vegetação por Diferença Normalizada",
+     "Mede o vigor da vegetação pelo contraste entre o vermelho, que as plantas absorvem, e o infravermelho próximo, "
+     "que elas refletem. Vai de −1 a 1. Valores altos, acima de 0,6, indicam vegetação densa. Perto de 0,2 está a "
+     "vegetação rala ou o campo seco. Perto de 0 está o solo exposto, e abaixo de 0, a água. No areal o NDVI fica "
+     "baixo o ano inteiro. Na lavoura ele sobe no auge da safra e cai depois da colheita.",
+     '<a class="cita" href="#ref-rouse1974">Rouse et al., 1974</a>',
+     "NDVI = (NIR − Vermelho) / (NIR + Vermelho)"),
+    ("ndwi", "NDWI", "Índice de Água por Diferença Normalizada",
+     "Compara o verde e o infravermelho próximo. Fica positivo sobre a água e negativo sobre vegetação e solo. Aqui "
+     "ele separa a classe Água e impede que a água seja contada como solo exposto.",
+     '<a class="cita" href="#ref-mcfeeters1996">McFeeters, 1996</a>',
+     "NDWI = (Verde − NIR) / (Verde + NIR)"),
+    ("bsi", "BSI", "Índice de Solo Exposto",
+     "Compara o infravermelho de ondas curtas e o vermelho, que o solo reflete mais, com o infravermelho próximo e o "
+     "azul, que a vegetação reflete ou absorve de outro jeito. Quanto maior, mais solo à mostra. A areia clara e seca "
+     "tem BSI alto.",
+     '<a class="cita" href="#ref-rikimaru2002">Rikimaru et al., 2002</a>',
+     "BSI = ((SWIR1 + Vermelho) − (NIR + Azul)) / ((SWIR1 + Vermelho) + (NIR + Azul))"),
+    ("freq", "Frequência de solo exposto", "",
+     "Não é um índice da imagem, é uma contagem. Mostra em que fração das cenas de __ANO__ o pixel apareceu como solo "
+     "exposto (NDVI abaixo de 0,25, BSI acima de 0 e NDWI abaixo de 0). Vai de 0, nunca exposto, a 1, exposto em "
+     "todas as cenas. É a variável que melhor separa o areal da lavoura.",
+     "",
+     "Frequência = cenas com solo exposto / cenas sem nuvem do pixel no ano"),
+]
+
+
+def _cartoes_indices(indices, ano):
+    cartoes = []
+    for chave, sigla, nome, texto, cita, formula in CARTOES_INDICES:
+        gradiente = (indices or {}).get(chave, {}).get("gradiente")
+        barra = f'<div class="barra-cor" style="background:{gradiente}" aria-hidden="true"></div>' if gradiente else ""
+        subtitulo = f'<span class="nome-indice">{nome}</span>' if nome else ""
+        fonte = f" ({cita})" if cita else ""
+        cartoes.append(
+            f'<div class="cartao-texto cartao-indice" id="indice-{chave}"><h4>{sigla}</h4>{subtitulo}{barra}'
+            f'<p>{texto.replace("__ANO__", str(ano))}{fonte}</p><details><summary>Ver fórmula</summary>'
+            f'<p class="formula">{formula}</p></details></div>')
+    return "".join(cartoes)
+
+
 def br(valor, casas=2):
     return f"{valor:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -149,6 +195,19 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
         for v in VARIAVEIS_ASSINATURA:
             q = sub[v].quantile([0.25, 0.5, 0.75]).round(6).tolist()
             assinatura["valores"].setdefault(v, []).append(q)
+
+    # Valores típicos dos índices nas amostras (mediana por classe) e número de variáveis do modelo
+    colunas_meta = {"areal_duvidoso", "classe", "conjunto", "grupo", "poligono"}
+    n_variaveis = len([c for c in amostras.columns if c not in colunas_meta])
+    linhas_tipicos = []
+    for c in [1, 7, 3, 2, 6, 4, 5]:
+        sub = amostras[amostras["classe"] == c]
+        if not sub.empty:
+            celulas = "".join(f'<td class="num">{br(sub[v].median())}</td>' for v in VARIAVEIS_TIPICAS)
+            linhas_tipicos.append(f"<tr><td>{nomes_treino[c]}</td>{celulas}</tr>")
+    cabecalho_tipicos = "".join(f'<th class="num">{r}</th>' for r in VARIAVEIS_TIPICAS.values())
+    tabela_tipicos = (f'<table><thead><tr><th>Classe</th>{cabecalho_tipicos}</tr></thead>'
+                      f'<tbody>{"".join(linhas_tipicos)}</tbody></table>')
 
     ajuste = pd.read_csv(proc / "ajuste_hiperparametros_rf.csv").sort_values("mean_test_score", ascending=False)
     melhor = ajuste.iloc[0]
@@ -292,6 +351,10 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
                              'Miracatu-Taquari no Rio Grande do Sul"><figcaption>Localização da ottobacia '
                              'Miracatu-Taquari (código 682636).</figcaption></figure>'
                              if figura_local.exists() else ""),
+        "__CARTOES_INDICES__": _cartoes_indices(indices, ano),
+        "__TABELA_TIPICOS__": tabela_tipicos,
+        "__N_VARIAVEIS__": str(n_variaveis),
+        "__N_CENAS_PAR__": f" ({n_cenas})" if n_cenas else "",
         "__DADOS__": dados_js,
     }
     pagina = MODELO
@@ -480,9 +543,43 @@ MODELO = r"""<!doctype html>
   .quadro th[scope=row] { font-weight: 600; white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--fundo); }
   .quadro th.projeto { color: var(--roxo); border-bottom: 2px solid var(--roxo); }
   .quadro td.projeto { background: var(--superficie); font-weight: 600; }
-  .trabalhos { display: grid; gap: 8px; margin-top: 16px; }
-  .trabalhos summary { font: 600 16px var(--titulo); cursor: pointer; }
-  .trabalhos p { margin: 8px 0 0; font-size: 15px; }
+  /* Linha do tempo dos trabalhos relacionados: horizontal com rolagem, vertical no celular */
+  .linha-trabalhos { --onda: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='12'%3E%3Cpath d='M0 6 Q20 0 40 6 T80 6' fill='none' stroke='%23D9C6A5' stroke-width='1.5'/%3E%3C/svg%3E");
+                 --onda-v: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='80'%3E%3Cpath d='M6 0 Q0 20 6 40 T6 80' fill='none' stroke='%23D9C6A5' stroke-width='1.5'/%3E%3C/svg%3E");
+                 list-style: none; margin: 16px 0 8px; padding: 0 0 12px; display: grid; grid-auto-flow: column;
+                 grid-auto-columns: minmax(260px, 46%); gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory;
+                 overscroll-behavior-x: contain; }
+  @media (prefers-color-scheme: dark) {
+    .linha-trabalhos { --onda: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='12'%3E%3Cpath d='M0 6 Q20 0 40 6 T80 6' fill='none' stroke='%234A3E32' stroke-width='1.5'/%3E%3C/svg%3E");
+                   --onda-v: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='80'%3E%3Cpath d='M6 0 Q0 20 6 40 T6 80' fill='none' stroke='%234A3E32' stroke-width='1.5'/%3E%3C/svg%3E"); }
+  }
+  .marco { position: relative; padding-top: 30px; scroll-snap-align: start; display: flex; }
+  .marco::before { content: ""; position: absolute; top: 6px; left: 0; width: calc(100% + 16px); height: 12px;
+                   background: var(--onda) repeat-x; background-size: 80px 12px; }
+  .marco:last-child::before { width: 100%; }
+  .marco::after { content: ""; position: absolute; top: 3px; left: 18px; width: 12px; height: 12px; border-radius: 999px;
+                  background: var(--fundo); border: 3px solid var(--duna); }
+  .marco > .cartao-texto { flex: 1; display: flex; flex-direction: column; }
+  .marco-ano { font: 700 26px var(--titulo); line-height: 1; }
+  .marco-autor { font-size: 14px; color: var(--texto-suave); margin-top: 4px; }
+  .marco-papel { font: 600 16px var(--titulo); margin-top: 10px; }
+  .marco p { font-size: 15px; margin: 8px 0 12px; }
+  .marco-aberto { margin-top: auto; border-top: 1px solid var(--duna); padding-top: 10px; font-size: 14px; }
+  .marco-aberto a { font-weight: 600; }
+  .marco-aberto p { margin: 4px 0 0; font-size: 14px; color: var(--texto-suave); }
+  .marco.destaque > .cartao-texto { box-shadow: inset 0 0 0 2px var(--roxo), var(--sombra); }
+  .marco.destaque::after { background: var(--roxo); border-color: var(--roxo); }
+  .marco.destaque .marco-ano, .marco.destaque .marco-papel { color: var(--link); }
+  /* Cartões dos índices e botão de ajuda da legenda */
+  .cartao-indice h4 { margin: 0; font: 600 18px var(--titulo); }
+  .nome-indice { display: block; font-size: 13px; color: var(--texto-suave); }
+  .cartao-indice p { font-size: 15px; margin: 8px 0; }
+  .cartao-indice summary { cursor: pointer; color: var(--link); font-size: 14px; font-weight: 500; }
+  .balao .cartao-indice-balao h4 { margin: 0; font: 600 15px var(--titulo); }
+  .balao .cartao-indice-balao p { margin: 6px 0; }
+  .li-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .botao-ajuda { flex: none; width: 24px; height: 24px; border-radius: 999px; border: 2px solid var(--roxo); background: var(--superficie);
+                 color: var(--link); font: 700 13px var(--titulo); cursor: pointer; padding: 0; line-height: 1; }
   .cita { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
   .balao { position: absolute; z-index: 6000; max-width: min(340px, calc(100vw - 16px)); background: var(--superficie);
            color: var(--texto); border-radius: 14px; box-shadow: 0 4px 18px rgba(43, 36, 32, 0.22); padding: 12px 16px;
@@ -549,6 +646,12 @@ MODELO = r"""<!doctype html>
     .legenda-indice { left: 8px; bottom: 8px; width: auto; max-width: calc(100% - 140px); }
     .coluna-mapa.tela-cheia .legenda { max-width: 260px; }
     .barra-linha { grid-template-columns: 96px 1fr 96px; font-size: 13px; }
+    .linha-trabalhos { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; scroll-snap-type: none; padding-left: 28px; }
+    .marco { padding-top: 0; }
+    .marco::before, .marco:last-child::before { top: 0; left: -24px; width: 12px; height: calc(100% + 16px);
+                                                background: var(--onda-v) repeat-y; background-size: 12px 80px; }
+    .marco:last-child::before { height: 100%; }
+    .marco::after { top: 20px; left: -25px; }
     .rodape { padding: 8px 16px 32px; }
   }
 </style>
@@ -585,11 +688,13 @@ MODELO = r"""<!doctype html>
       <ul>__LEGENDA__<li id="leg-outras" hidden><span class="cor" style="background:__COR_OUTRAS__"></span>Outras classes do MapBiomas</li></ul>
     </details>
     <div class="painel legenda-indice" id="legenda-indice" hidden aria-live="polite">
-      <b id="li-nome"></b><span class="li-periodo" id="li-periodo"></span>
+      <div class="li-topo"><div><b id="li-nome"></b><span class="li-periodo" id="li-periodo"></span></div>
+        <button type="button" class="botao-ajuda" id="li-ajuda" aria-haspopup="dialog" aria-expanded="false"
+                aria-label="Como ler este índice">?</button></div>
       <div class="barra-cor" id="li-barra"></div>
       <div class="escala"><span id="li-min"></span><span id="li-max"></span></div>
       <p id="li-significado"></p>
-      <p class="li-nota">Manchas de areal em contorno; clique numa delas para ver as curvas.</p>
+      <p class="li-nota">Manchas de areal em contorno. Clique numa delas para ver as curvas.</p>
     </div>
     <button type="button" class="botao-expandir" id="expandir" aria-expanded="false" aria-controls="coluna-mapa">Expandir mapa</button>
   </div>
@@ -629,7 +734,7 @@ __VENTO__
   </div>
   <p class="dica"><b>O mapa acompanha o texto:</b> ao rolar, ele muda de camada e de enquadramento a cada seção. Se você
   mexer no mapa, a condução automática pausa até a próxima seção. Para conferir o resultado, use o fundo
-  <b>Sentinel-2 __ANO__</b>, mova o <b>período da imagem</b> pelos bimestres (o areal fica exposto o ano todo; a lavoura,
+  <b>Sentinel-2 __ANO__</b>, mova o <b>período da imagem</b> pelos bimestres (o areal fica exposto o ano todo, mas a lavoura
   só em parte dele) e compare lado a lado com o MapBiomas. A partir do zoom 14, as manchas de areal ganham contorno e
   mostram a área ao clicar.</p>
 </section>
@@ -644,7 +749,7 @@ __VENTO__
   <p>Este projeto mapeia os areais existentes em __ANO__ na ottobacia <b>Miracatu-Taquari</b> (código 682636, nível 6 da ANA,
   __AREA_TOTAL__ km², entre Manoel Viana e São Francisco de Assis, sudoeste do RS) com imagens Sentinel-2 a 10 m e
   Random Forest. A diferença em relação aos mapeamentos anteriores é usar a <b>série do ano inteiro</b>: o areal fica
-  exposto quase o ano todo; a lavoura, só em parte dele.</p>
+  exposto quase o ano todo, e a lavoura só em parte dele.</p>
   <div class="grade">
     <div class="cartao-texto">
       <h3>Objetivos de Desenvolvimento Sustentável</h3>
@@ -658,21 +763,55 @@ __VENTO__
       reprodutível e este mapa web.</p>
     </div>
   </div>
-  <p>O inventário será a base de validação de um mapa de suscetibilidade à arenização por Análise Hierárquica de
-  Processos (AHP), em desenvolvimento no mestrado em Geografia da UFSM.</p>
+  <p>Este inventário faz parte de um estudo mais amplo sobre os processos de arenização nesta bacia, desenvolvido no
+  mestrado em Geografia da UFSM.</p>
   __FIGURA_LOCAL__
 
   <h3>Trabalhos relacionados</h3>
-  <p><a class="cita" href="#ref-suertegaray1992">Suertegaray (1992)</a> propôs o termo <b>arenização</b> para os areais do
-  sudoeste gaúcho: em clima úmido, a degradação não é desertificação, e sim o retrabalhamento de depósitos arenosos pouco
-  consolidados, em que a areia em movimento dificulta a fixação da vegetação.
-  <a class="cita" href="#ref-souza2017">Souza e Pires (2017)</a> mapearam os areais do Arroio Puitã entre 1984 e 2014 com
-  imagens Landsat e Máxima Verossimilhança, uma imagem por data; a transição entre campo e areal, de vegetação rala, saiu
-  como solo exposto, com resposta parecida com a de solo em cultivo inicial.
-  <a class="cita" href="#ref-rayne2023">Rayne et al. (2023)</a> detectaram campos desertificados no Marrocos com
-  Sentinel-2, Google Earth Engine e Random Forest, com acurácias de 74% a 76% na classe de desertificação. Este projeto
-  une as duas linhas: aplica o método de Rayne et al. ao problema regional, com 10 m de resolução e a série do ano
-  inteiro, para separar o areal da lavoura.</p>
+  <p>Três trabalhos orientam este projeto. Cada um resolve uma parte do problema e deixa outra em aberto, e é dessa
+  sequência que vem o desenho do mapa.</p>
+  <ol class="linha-trabalhos" aria-label="Linha do tempo dos trabalhos relacionados" tabindex="0">
+    <li class="marco" id="marco-1992"><div class="cartao-texto">
+      <span class="marco-ano">1992</span>
+      <span class="marco-autor"><a class="cita" href="#ref-suertegaray1992">Suertegaray</a></span>
+      <b class="marco-papel">O conceito</b>
+      <p>Ao estudar os areais do sudoeste gaúcho, Suertegaray mostrou que eles não são um deserto. Em clima úmido, o
+      que existe é a arenização, o retrabalhamento de depósitos arenosos pouco consolidados, em que a areia em
+      movimento impede a vegetação de se fixar. O conceito define o que este mapa procura: areia exposta de forma
+      persistente sobre esses depósitos.</p>
+      <div class="marco-aberto"><a href="#marco-2017">O que ficou em aberto →</a>
+        <p>Onde estão os areais hoje e como acompanhá-los ao longo do tempo.</p></div>
+    </div></li>
+    <li class="marco" id="marco-2017"><div class="cartao-texto">
+      <span class="marco-ano">2017</span>
+      <span class="marco-autor"><a class="cita" href="#ref-souza2017">Souza e Pires</a></span>
+      <b class="marco-papel">O mapeamento regional</b>
+      <p>No Arroio Puitã, Souza e Pires acompanharam os areais de 1984 a 2014 com imagens Landsat e classificação por
+      Máxima Verossimilhança, uma imagem por data. O trabalho mostra a dinâmica regional e traz um alerta: a transição
+      entre campo e areal, de vegetação rala, aparece como solo exposto e se parece com solo em cultivo inicial.</p>
+      <div class="marco-aberto"><a href="#marco-2023">O que ficou em aberto →</a>
+        <p>Com uma única data e 30 m de resolução, o areal se confunde com a lavoura em preparo de solo.</p></div>
+    </div></li>
+    <li class="marco" id="marco-2023"><div class="cartao-texto">
+      <span class="marco-ano">2023</span>
+      <span class="marco-autor"><a class="cita" href="#ref-rayne2023">Rayne et al.</a></span>
+      <b class="marco-papel">O método</b>
+      <p>No sul do Marrocos, Rayne et al. detectaram campos degradados por desertificação com Sentinel-2, Google Earth
+      Engine e Random Forest, com 74 a 76% de acerto na classe de interesse. Daí vêm o fluxo de trabalho deste projeto
+      e uma referência realista do que esperar de acurácia.</p>
+      <div class="marco-aberto"><a href="#marco-2025">O que ficou em aberto →</a>
+        <p>Uma única estação do ano, em clima árido, sem a confusão com a lavoura.</p></div>
+    </div></li>
+    <li class="marco destaque" id="marco-2025"><div class="cartao-texto">
+      <span class="marco-ano">__ANO__</span>
+      <span class="marco-autor">Este projeto</span>
+      <b class="marco-papel">A síntese</b>
+      <p>Este projeto aplica o método de Rayne et al. ao problema descrito por Suertegaray e por Souza e Pires, com
+      Sentinel-2 a 10 m e a série do ano inteiro. O areal fica exposto em quase todas as cenas, a lavoura só em parte
+      delas, e é essa diferença que separa as duas classes.</p>
+    </div></li>
+  </ol>
+  <h3>Comparação rápida</h3>
   <div class="rolagem"><table class="quadro">
     <thead><tr><th scope="col">Critério</th><th scope="col">Souza e Pires (2017)</th><th scope="col">Rayne et al. (2023)</th>
       <th scope="col" class="projeto">Este projeto</th></tr></thead>
@@ -685,34 +824,6 @@ __VENTO__
       <tr><th scope="row">Limite</th><td>transição campo–areal confundida com cultivo</td><td>uma estação só</td><td class="projeto">sem verificação de campo</td></tr>
     </tbody>
   </table></div>
-  <div class="trabalhos">
-    <details class="cartao-texto">
-      <summary>Suertegaray (1992)</summary>
-      <p><b>O que fez:</b> definiu a arenização como um processo próprio do clima úmido do sudoeste gaúcho, distinto da
-      desertificação: o retrabalhamento de depósitos arenosos pouco consolidados.</p>
-      <p><b>O que aproveitamos:</b> o conceito, que define o alvo do mapa: areia exposta sobre depósitos arenosos, com
-      dificuldade de fixação da vegetação.</p>
-      <p><b>A lacuna:</b> o conceito precisa de um inventário atualizado e reprodutível dos areais, que é o que este
-      projeto produz.</p>
-    </details>
-    <details class="cartao-texto">
-      <summary>Souza e Pires (2017)</summary>
-      <p><b>O que fizeram:</b> o mapeamento multitemporal dos areais do Arroio Puitã de 1984 a 2014, com Landsat e
-      Máxima Verossimilhança, uma imagem por data.</p>
-      <p><b>O que aproveitamos:</b> a referência regional da dinâmica dos areais e o alerta de que a transição
-      campo–areal se parece com solo em cultivo inicial.</p>
-      <p><b>A lacuna:</b> com uma data e 30 m, o areal não se separa do solo exposto agrícola.</p>
-    </details>
-    <details class="cartao-texto">
-      <summary>Rayne et al. (2023)</summary>
-      <p><b>O que fizeram:</b> detectaram campos desertificados em oásis do sul do Marrocos com Sentinel-2 e Sentinel-1,
-      Google Earth Engine e Random Forest, sobre a mediana de jun–ago 2021.</p>
-      <p><b>O que aproveitamos:</b> o fluxo Sentinel-2, Earth Engine e Random Forest e o parâmetro realista de acurácia
-      (74–76% na classe-alvo).</p>
-      <p><b>A lacuna:</b> uma estação só, em clima árido. Aqui a série do ano inteiro separa o areal, exposto o ano
-      todo, da lavoura, exposta só em parte dele.</p>
-    </details>
-  </div>
 </section>
 
 <section class="secao" id="dados">
@@ -737,17 +848,24 @@ __VENTO__
   __VENTO__
   <h2>Método</h2>
   <ol class="passos">
-    <li><b>Imagens</b><span>Todas as cenas Sentinel-2 de __ANO__ sobre a bacia, com nuvens mascaradas pelo Cloud Score+.</span></li>
-    <li><b>Índices por cena</b><span>NDVI, BSI, NDWI e uma marcação de solo exposto (NDVI &lt; 0,25, BSI &gt; 0 e NDWI &lt; 0).</span></li>
-    <li><b>Variáveis anuais</b><span>Medianas das bandas, estatísticas do NDVI, BSI e NDWI medianos e a frequência de solo exposto no ano: 14 variáveis por pixel.</span></li>
-    <li><b>Amostras</b><span>Polígonos desenhados em SIG e revisados; os areais passam por controle de qualidade.</span></li>
-    <li><b>Treino e teste</b><span>Divisão espacial 70/30 por grupos de polígonos vizinhos; __N_TREINO__ pontos de treino e __N_TESTE__ de teste.</span></li>
-    <li><b>Random Forest</b><span>Hiperparâmetros por validação cruzada espacial; classificação da bacia no Earth Engine e filtro entre Silvicultura e Vegetação Nativa.</span></li>
+    <li><b>Imagens</b><span>Todas as cenas Sentinel-2 de __ANO__ sobre a bacia__N_CENAS_PAR__, com as nuvens removidas pelo Cloud Score+.</span></li>
+    <li><b>Índices por cena</b><span>NDVI, BSI e NDWI, mais uma marcação de solo exposto quando o NDVI fica abaixo de 0,25, o BSI acima de 0 e o NDWI abaixo de 0.</span></li>
+    <li><b>Variáveis anuais</b><span>São __N_VARIAVEIS__ por pixel: as medianas das bandas, as estatísticas do NDVI (mínimo, médio, máximo, amplitude e desvio), o BSI e o NDWI medianos e a frequência de solo exposto no ano.</span></li>
+    <li><b>Amostras</b><span>Polígonos desenhados em SIG e revisados um a um. Os areais passam por um controle de qualidade próprio.</span></li>
+    <li><b>Treino e teste</b><span>As amostras foram divididas em 70% para treino e 30% para teste, sempre por grupos de polígonos vizinhos, para que áreas quase idênticas não fiquem dos dois lados. Foram __N_TREINO__ pontos de treino e __N_TESTE__ de teste.</span></li>
+    <li><b>Random Forest</b><span>Os hiperparâmetros foram escolhidos por validação cruzada espacial. A bacia foi classificada no Earth Engine, e um filtro final corrige a troca de pixels entre Silvicultura e Vegetação Nativa.</span></li>
   </ol>
+
+  <h3>Como ler os índices</h3>
+  <div class="grade">__CARTOES_INDICES__</div>
+  <h4>Valores típicos nas amostras</h4>
+  <div class="rolagem">__TABELA_TIPICOS__</div>
+  <p class="nota">Mediana de cada classe nos pontos de amostra de __ANO__. A Lavoura exposta é uma subclasse do treino,
+  juntada à Lavoura no mapa final.</p>
 
   <h3>Por que a série do ano inteiro separa areal e lavoura</h3>
   <p>Numa única data, areal e lavoura em preparo de solo são parecidos. No ano, não: o areal fica exposto em boa parte
-  das cenas e tem NDVI baixo e estável; a lavoura alterna solo exposto e vegetação densa. Talhões expostos quase o ano
+  das cenas e tem NDVI baixo e estável, enquanto a lavoura alterna solo exposto e vegetação densa. Talhões expostos quase o ano
   todo (pousio, palhada) foram treinados como uma subclasse, <b>Lavoura exposta</b>, e juntados à Lavoura no mapa final.
   O gráfico mostra a mediana de cada classe nas amostras (barra) e o intervalo entre os quartis 25% e 75% (traço).</p>
   <div class="abas" id="abas-assinatura" role="tablist" aria-label="Variável"></div>
@@ -756,16 +874,9 @@ __VENTO__
   frequência de solo exposto é a mesma variável do modelo). No mapa, clique numa mancha de areal para comparar as
   suas curvas com as de Lavoura e Campo.</p>
 
-  <h3>Índices</h3>
-  <div class="grade">
-    <div class="cartao-texto formula">NDVI = (NIR − Vermelho) / (NIR + Vermelho)</div>
-    <div class="cartao-texto formula">BSI = ((SWIR1 + Vermelho) − (NIR + Azul)) / ((SWIR1 + Vermelho) + (NIR + Azul))</div>
-    <div class="cartao-texto formula">NDWI = (Verde − NIR) / (Verde + NIR)</div>
-  </div>
-
   <h3>Controle de qualidade dos areais</h3>
   <p>Cada polígono de areal foi medido no próprio Sentinel-2: é <b>núcleo de areal</b> se ficou exposto em pelo menos
-  metade das cenas e tem NDVI médio até 0,30; os demais são <b>duvidosos</b> e foram revisados um a um. O controle de
+  metade das cenas e tem NDVI médio até 0,30. Os demais são <b>duvidosos</b> e foram revisados um a um. O controle de
   qualidade nunca filtra o teste, para não deixar só os casos fáceis e inflar a acurácia.</p>
   <div class="rolagem"><table>
     <thead><tr><th>Polígonos de areal nas amostras</th><th class="num">Polígonos</th><th class="num">Área (ha)</th></tr></thead>
@@ -803,7 +914,7 @@ __VENTO__
   __VENTO__
   <h2>Validação</h2>
   <p>Acurácia global de <b>__ACURACIA__</b> e F1 macro de <b>__F1_MACRO__</b> nos pontos de teste (__ORIGEM_METRICAS__),
-  que ficam em polígonos separados dos de treino. O F1 do Areal é <b>__F1__</b>; a classe mais difícil é o Campo, que se
+  que ficam em polígonos separados dos de treino. O F1 do Areal é <b>__F1__</b>. A classe mais difícil é o Campo, que se
   confunde com a lavoura e com areais revegetados.</p>
   <div class="abas" id="abas-metricas" role="tablist" aria-label="Conjunto de métricas"></div>
   <div class="rolagem"><table id="tabela-metricas"></table></div>
@@ -815,7 +926,7 @@ __VENTO__
     <p>A primeira versão do mapa tinha mais de 90% de acurácia no teste, mas marcava 19% da bacia como areal. A
     comparação com o MapBiomas revelou o excesso, e a revisão das amostras (areais duvidosos reclassificados e amostras
     de Lavoura exposta) reduziu o areal para __PCT__% da bacia. <b>Acurácia alta no teste não garante um bom mapa:</b>
-    o teste mede o modelo em amostras típicas; a comparação com referências mede o mapa inteiro.</p>
+    o teste mede o modelo em amostras típicas, e a comparação com referências mede o mapa inteiro.</p>
   </div>
 </section>
 
@@ -836,20 +947,20 @@ __VENTO__
     (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>): quando a cobertura é removida, a "expansão lateral e remontante das ravinas e
     voçorocas, promove a formação do areal propriamente dito" (<a class="cita" href="#ref-suertegaray2011">idem</a>), e a "constante mobilidade dos sedimentos"
     dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>). Por isso, as manchas de solo arenoso exposto
-    encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>; parte ainda pode
+    encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>. Parte ainda pode
     ser manejo (pousio, preparo do solo), e a confirmação em campo é o próximo passo.</p>
     <p>A literatura sustenta essa leitura. A arenização é o "retrabalhamento de depósitos areníticos (pouco
     consolidados) ou arenosos (não consolidados)" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>), e "este processo poderá ser
     desencadeado por agentes naturais ou atividades humanas" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Numa área piloto entre
     São Francisco de Assis e Manoel Viana, a mesma região desta bacia, na frente de expansão da soja, a análise
     multitemporal registrou aumento de 47,52 ha de areais em 25 anos, resultados que "indicam o surgimento de novas
-    manchas de areia (areais)" (Suertegaray; Guasselli; Franz, 1995 apud <a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Ravinas e
+    manchas de areia (areais)" (Suertegaray, Guasselli e Franz, 1995 apud <a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Ravinas e
     sulcos também podem resultar do "uso de maquinaria pesada na atividade agrícola"
     (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 64</a>).</p>
   </div>
   __BLOCO_SEMA__
   <h3>Matriz de concordância</h3>
-  <p class="nota">Cada linha é uma classe deste mapa; as colunas mostram como a mesma área aparece no MapBiomas (% da
+  <p class="nota">Cada linha é uma classe deste mapa, e as colunas mostram como a mesma área aparece no MapBiomas (% da
   linha). Passe o mouse para ver a área em km².</p>
   <div class="rolagem">__MATRIZ_MB__</div>
 </section>
@@ -861,7 +972,7 @@ __VENTO__
     <li>A acurácia vem de amostras em áreas típicas de cada classe, sem verificação de campo. Uma amostra aleatória
     estratificada sobre o mapa permitiria estimar a acurácia sem esse viés e corrigir a área por classe
     (<a class="cita" href="#ref-olofsson2014">Olofsson et al., 2014</a>).</li>
-    <li>A área é a contagem de pixels; ainda não tem intervalo de confiança.</li>
+    <li>A área é a contagem de pixels e ainda não tem intervalo de confiança.</li>
     <li>Talhões expostos quase o ano todo ainda podem se parecer com areal. Variáveis de textura ou classificação por
     objetos (segmentação) podem reduzir essa confusão.</li>
     <li>O Campo é a classe com menor acerto e se confunde com lavoura e com areais revegetados.</li>
@@ -870,7 +981,7 @@ __VENTO__
     separaria os corpos d'água permanentes das áreas úmidas temporárias.</li>
     <li>A resolução de 10–20 m não captura areais muito pequenos ou estreitos, e areais sob silvicultura não aparecem.</li>
     <li>O mapa cobre um único ano. Aplicar o mesmo fluxo a anos anteriores permitiria medir a expansão dos areais.</li>
-    <li>Próximo passo: usar o inventário para validar o mapa de suscetibilidade à arenização por AHP do mestrado em
+    <li>Integrar o inventário ao estudo dos processos de arenização da bacia, em desenvolvimento no mestrado em
     Geografia da UFSM.</li>
   </ul>
 </section>
@@ -880,9 +991,12 @@ __VENTO__
   <h2>Referências</h2>
   <ul class="nota">
     <li>MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Disponível em: brasil.mapbiomas.org.</li>
+    <li id="ref-mcfeeters1996" data-doi="10.1080/01431169608948714">McFEETERS, S. K. The use of the Normalized Difference Water Index (NDWI) in the delineation of open water features. <i>International Journal of Remote Sensing</i>, v. 17, n. 7, p. 1425–1432, 1996.</li>
     <li id="ref-olofsson2014" data-doi="10.1016/j.rse.2014.02.015">OLOFSSON, P. et al. Good practices for estimating area and assessing accuracy of land change. <i>Remote Sensing of Environment</i>, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.</li>
     <li id="ref-rayne2023" data-doi="10.1038/s41598-023-46319-1">RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. <i>Scientific Reports</i>, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.</li>
+    <li id="ref-rikimaru2002">RIKIMARU, A.; ROY, P. S.; MIYATAKE, S. Tropical forest cover density mapping. <i>Tropical Ecology</i>, v. 43, n. 1, p. 39–47, 2002.</li>
     <li>RIO GRANDE DO SUL. Secretaria do Meio Ambiente e Infraestrutura (SEMA). Mapeamento de areais do Rio Grande do Sul. 2020. Disponível em: https://sema.rs.gov.br/areais.</li>
+    <li id="ref-rouse1974">ROUSE, J. W. et al. Monitoring vegetation systems in the Great Plains with ERTS. In: <i>Third ERTS Symposium</i>, NASA SP-351, p. 309–317, 1974.</li>
     <li id="ref-souza2017" data-doi="10.20502/rbg.v18i1.1051">SOUZA, A. C.; PIRES, C. A. F. Dinâmica da arenização na bacia hidrográfica do Arroio Puitã, oeste do RS, através do mapeamento multitemporal no período de 1984 a 2014. <i>Revista Brasileira de Geomorfologia</i>, v. 18, n. 1, p. 185–196, 2017. DOI: 10.20502/rbg.v18i1.1051.</li>
     <li id="ref-suertegaray1992">SUERTEGARAY, D. M. A. <i>Deserto Grande do Sul: controvérsia</i>. Porto Alegre: Editora da UFRGS, 1992.</li>
     <li id="ref-suertegaray2011">SUERTEGARAY, D. M. A. Erosão nos campos sulinos: arenização no sudoeste do Rio Grande do Sul. <i>Revista Brasileira de Geomorfologia</i>, v. 12, n. 3, p. 61–74, 2011.</li>
@@ -892,14 +1006,14 @@ __VENTO__
   Future Tech Leaders Brasil, Agência Espacial Brasileira (AEB), SDG AI Lab e UNDP/ICPSD.</p>
   <p class="nota">Agradecimentos ao Prof. Romário Trentin, orientador do mestrado, como referência e pela integração
   deste estudo à pesquisa sobre arenização, e a Marco Antônio da Rosa Soares, pelo apoio ao projeto.</p>
-  <p class="nota">Parte do código e da revisão do texto teve apoio de IA (Claude, Anthropic); as decisões de método, a
+  <p class="nota">Parte do código e da revisão do texto teve apoio de IA (Claude, Anthropic), mas as decisões de método, a
   coleta e a conferência das amostras são da autora.</p>
 </section>
 
 __VENTO__
 <footer class="rodape">
   <p>Fontes: imagens Sentinel-2 (ESA/Copernicus), Cloud Score+ (Google), MapBiomas 10 m, mapeamento de areais da SEMA-RS e
-  ottobacias da ANA. Código sob licença MIT; dados produzidos no projeto sob CC BY 4.0.</p>
+  ottobacias da ANA. Código sob licença MIT e dados produzidos no projeto sob CC BY 4.0.</p>
   <p><a href="__REPO__">Código, dados e metodologia completa no GitHub</a></p>
 </footer>
 </main>
@@ -1083,7 +1197,7 @@ function conteudoPopup(props, nome) {
       + miniGrafico(serie, nome)
       + `<div class="mini-legenda"><span style="--cor:#E4572E">esta mancha</span>`
       + `<span class="tracejada" style="--cor:#B08A2E">Lavoura típica</span><span class="tracejada" style="--cor:#6E8F3A">Campo típico</span></div>`
-      + `<small>Medianas bimestrais de __ANO__; Lavoura e Campo: mediana dos polígonos de amostra.</small>`;
+      + `<small>Medianas bimestrais de __ANO__. Lavoura e Campo típicos são a mediana dos polígonos de amostra.</small>`;
   }
   return `<div class="popup-areal">${corpo}</div>`;
 }
@@ -1233,18 +1347,22 @@ balao.setAttribute("role", "dialog");
 balao.hidden = true;
 document.body.appendChild(balao);
 let citaAberta = null, fecharDepois = null;
-function abrirCitacao(link) {
+function mostrarBalao(link, conteudo) {
   clearTimeout(fecharDepois);
-  const ref = document.querySelector(link.getAttribute("href"));
-  if (!ref) return;
-  balao.innerHTML = ref.innerHTML + (ref.dataset.doi
-    ? `<br><a class="botao-doi" href="https://doi.org/${ref.dataset.doi}" target="_blank" rel="noopener">DOI ↗</a>` : "");
+  balao.innerHTML = conteudo;
   balao.hidden = false;
   const r = link.getBoundingClientRect();
-  const largura = balao.offsetWidth;
+  const largura = balao.offsetWidth, altura = balao.offsetHeight;
   balao.style.left = Math.max(8, Math.min(r.left + scrollX, scrollX + document.documentElement.clientWidth - largura - 8)) + "px";
-  balao.style.top = r.bottom + scrollY + 6 + "px";
+  const cabeEmbaixo = r.bottom + 6 + altura <= document.documentElement.clientHeight || r.top < altura + 12;
+  balao.style.top = (cabeEmbaixo ? r.bottom + 6 : r.top - altura - 6) + scrollY + "px";
   requestAnimationFrame(() => balao.classList.add("visivel"));
+}
+function abrirCitacao(link) {
+  const ref = document.querySelector(link.getAttribute("href"));
+  if (!ref) return;
+  mostrarBalao(link, ref.innerHTML + (ref.dataset.doi
+    ? `<br><a class="botao-doi" href="https://doi.org/${ref.dataset.doi}" target="_blank" rel="noopener">DOI ↗</a>` : ""));
   if (citaAberta) citaAberta.setAttribute("aria-expanded", "false");
   citaAberta = link;
   link.setAttribute("aria-expanded", "true");
@@ -1267,7 +1385,28 @@ document.querySelectorAll(".cita").forEach((link) => {
 });
 balao.addEventListener("pointerenter", () => clearTimeout(fecharDepois));
 balao.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") fecharDepois = setTimeout(fecharCitacao, 250); });
-document.addEventListener("click", (e) => { if (citaAberta && !balao.contains(e.target) && !e.target.closest(".cita")) fecharCitacao(); });
+document.addEventListener("click", (e) => { if (citaAberta && !balao.contains(e.target) && !e.target.closest(".cita, .botao-ajuda")) fecharCitacao(); });
+
+// Botão "?" da legenda do índice: abre o cartão "Como ler os índices" do índice ligado
+const botaoAjuda = document.getElementById("li-ajuda");
+botaoAjuda.addEventListener("click", () => {
+  if (citaAberta === botaoAjuda) { fecharCitacao(); return; }
+  const cartao = document.getElementById("indice-" + indiceAtual);
+  if (!cartao) return;
+  mostrarBalao(botaoAjuda, `<div class="cartao-indice-balao">${cartao.innerHTML}</div>`);
+  balao.querySelectorAll("details").forEach((d) => (d.open = true));
+  if (citaAberta) citaAberta.setAttribute("aria-expanded", "false");
+  citaAberta = botaoAjuda;
+  botaoAjuda.setAttribute("aria-expanded", "true");
+});
+
+// Linha do tempo: "O que ficou em aberto →" leva ao marco seguinte
+document.querySelectorAll(".marco-aberto a").forEach((a) => a.addEventListener("click", (e) => {
+  e.preventDefault();
+  document.querySelector(a.getAttribute("href")).scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "nearest", inline: "start" });
+}));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && citaAberta) { const l = citaAberta; fecharCitacao(); l.focus(); } });
 
 // ---------------------------------------------------------------- Abas reutilizáveis

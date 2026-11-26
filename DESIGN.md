@@ -144,6 +144,13 @@ cores das classes nunca viram botões ou títulos, e o roxo nunca entra no mapa.
 - **Botões:** pílula com fundo roxo (ação principal) ou contorno roxo (secundário).
 - **Comparação com o MapBiomas:** controle deslizante lado a lado (swipe).
 - **Citações:** link sublinhado pontilhado que abre um balão com a referência e o DOI.
+- **Linha do tempo dos trabalhos:** marcos (ano, autor, papel, texto e "O que ficou em
+  aberto →", que leva ao marco seguinte) ligados por uma linha de vento. Horizontal com
+  rolagem no desktop e vertical no celular. O marco deste projeto tem contorno e ano em
+  roxo, sem fundo roxo.
+- **Cartões dos índices:** sigla, nome, barra com a mesma rampa do mapa, texto e a
+  fórmula num `<details>` "Ver fórmula". O botão "?" da legenda do índice abre o cartão
+  num balão.
 
 ## Faça / evite
 
@@ -157,3 +164,5 @@ cores das classes nunca viram botões ou títulos, e o roxo nunca entra no mapa.
 - Animações longas: interface em até 200 ms; só a troca de imagens (400 ms) e o
   voo do mapa (1,2 s) passam disso.
 - Rótulos de classe só em inglês: a página é em português.
+- Ponto e vírgula no texto da página: usar frases separadas ou "e", "mas", "porque".
+  Só as referências (ABNT) mantêm o ponto e vírgula entre autores.
