@@ -45,14 +45,16 @@ VARIAVEIS_TIPICAS = {"NDVI_medio": "NDVI médio", "NDWI_med": "NDWI mediano", "B
 CARTOES_INDICES = [
     ("ndvi", "NDVI", "Índice de Vegetação por Diferença Normalizada",
      "Mede o vigor da vegetação pelo contraste entre o vermelho, que as plantas absorvem, e o infravermelho próximo, "
-     "que elas refletem. Vai de −1 a 1. Valores altos, acima de 0,6, indicam vegetação densa. Perto de 0,2 está a "
-     "vegetação rala ou o campo seco. Perto de 0 está o solo exposto, e abaixo de 0, a água. No areal o NDVI fica "
-     "baixo o ano inteiro. Na lavoura ele sobe no auge da safra e cai depois da colheita.",
+     "que elas refletem. Vai de −1 a 1. Abaixo de 0, água. Entre 0 e 0,25, solo exposto (o limiar usado neste "
+     "projeto). Entre 0,25 e 0,5, vegetação rala ou campo seco. Acima de 0,6, vegetação densa. O NDVI médio do "
+     "areal fica no limite porque mistura as cenas de areia exposta com as de vegetação rala. Na lavoura ele sobe no auge da safra e cai depois da colheita.",
      '<a class="cita" href="#ref-rouse1974">Rouse et al., 1974</a>',
      "NDVI = (NIR − Vermelho) / (NIR + Vermelho)"),
     ("ndwi", "NDWI", "Índice de Água por Diferença Normalizada",
-     "Compara o verde e o infravermelho próximo. Fica positivo sobre a água e negativo sobre vegetação e solo. Aqui "
-     "ele separa a classe Água e impede que a água seja contada como solo exposto.",
+     "Compara o verde e o infravermelho próximo. Fica negativo sobre vegetação e solo e positivo sobre água limpa "
+     "e profunda. Nos açudes da bacia, rasos e turvos, ele fica perto de zero, mas ainda bem acima das outras "
+     "classes. A condição do NDWI reduz, mas não elimina, a contagem da água como solo exposto, e isso explica "
+     "parte da confusão da classe Água.",
      '<a class="cita" href="#ref-mcfeeters1996">McFeeters, 1996</a>',
      "NDWI = (Verde − NIR) / (Verde + NIR)"),
     ("bsi", "BSI", "Índice de Solo Exposto",
@@ -219,6 +221,12 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
     cabecalho_tipicos = "".join(f'<th class="num">{r}</th>' for r in VARIAVEIS_TIPICAS.values())
     tabela_tipicos = (f'<table><thead><tr><th>Classe</th>{cabecalho_tipicos}</tr></thead>'
                       f'<tbody>{"".join(linhas_tipicos)}</tbody></table>')
+    # Frequência de solo exposto mediana por classe, citada no texto (sai do mesmo CSV da tabela de valores típicos)
+    def pct_freq(c):
+        return round(100 * amostras.loc[amostras["classe"] == c, "FREQ_EXPOSTO"].median())
+    freq_areal = "metade das cenas" if pct_freq(1) == 50 else f"{pct_freq(1)}% das cenas"
+    tipicas = {k: dict(v) for k, v in (tipicas or {}).items()}
+    tipicas.setdefault("Lavoura", {})["freq"] = round(float(amostras.loc[amostras["classe"] == 3, "FREQ_EXPOSTO"].median()), 3)
 
     ajuste = pd.read_csv(proc / "ajuste_hiperparametros_rf.csv").sort_values("mean_test_score", ascending=False)
     melhor = ajuste.iloc[0]
@@ -323,7 +331,8 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
         "__AREA__": br(area_areal), "__PCT__": br(100 * area_areal / area_total, 1), "__F1__": br(f1_areal),
         "__ACURACIA__": br(principal["acuracia"]), "__F1_MACRO__": br(principal["f1_macro"]),
         "__ORIGEM_METRICAS__": "do mapa do Earth Engine" if metricas["ee"] else "do modelo (scikit-learn)",
-        "__N_TREINO__": br(n_treino, 0), "__N_TESTE__": br(n_teste, 0),
+        "__N_TREINO__": br(n_treino, 0), "__FREQ_AREAL__": freq_areal,
+        "__FREQ_LAVOURA__": f"{pct_freq(3)}%", "__FREQ_LAV_EXP__": f"{pct_freq(7)}%", "__N_TESTE__": br(n_teste, 0),
         "__ARVORES__": str(int(melhor["param_n_estimators"])), "__PROFUNDIDADE__": profundidade,
         "__VAR_DIVISAO__": str(melhor["param_max_features"]).replace("sqrt", "raiz quadrada do total"),
         "__F1_CV__": br(melhor["mean_test_score"], 3), "__F1_CV_DP__": br(melhor["std_test_score"], 3),
@@ -475,6 +484,10 @@ MODELO = r"""<!doctype html>
   .controles { left: 12px; top: 12px; }
   .conteudo-controles { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
   .conteudo-controles .check-ref { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+  .rotulo-municipio { background: rgba(31, 26, 21, 0.72); color: #FFF4D6; border: none; border-radius: 8px; box-shadow: none;
+                      padding: 3px 8px; font: 600 12.5px var(--corpo); text-align: center; line-height: 1.25; }
+  .rotulo-municipio span { display: block; font-weight: 400; font-size: 11.5px; opacity: 0.9; }
+  .rotulo-municipio::before { display: none; }
   .controles label { display: flex; flex-direction: column; gap: 4px; }
   .controles input[type=range] { accent-color: var(--roxo); width: 210px; }
   .controles .seletor { width: 210px; font-size: 13px; }
@@ -500,18 +513,29 @@ MODELO = r"""<!doctype html>
   .li-nota { margin: 4px 0 2px; font-size: 11px; color: var(--texto-suave); }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--superficie); color: var(--texto); }
   .popup-areal { font: 13px/1.4 var(--corpo); }
-  .mini-abas { display: flex; gap: 4px; margin: 6px 0 2px; }
-  .mini-aba { font: 600 11px var(--corpo); padding: 2px 9px; border-radius: 999px; border: 1.5px solid var(--roxo);
+  .popup-areal .titulo-mancha { display: block; font: 600 15px var(--titulo); margin-bottom: 4px; }
+  .mini-numeros { margin: 0 0 6px; font-size: 13px; }
+  .mini-numeros span { display: block; }
+  .como-ler { margin: 4px 0 6px; font-size: 12.5px; line-height: 1.4; }
+  .mini-abas { display: flex; gap: 4px; margin: 6px 0 4px; }
+  .mini-aba { font: 600 12px var(--corpo); padding: 2px 10px; border-radius: 999px; border: 1.5px solid var(--roxo);
               background: transparent; color: var(--link); cursor: pointer; }
   .mini-aba[aria-pressed=true] { background: var(--roxo); color: var(--sobre-acento); }
-  .minigrafico { display: block; width: 260px; height: 132px; }
-  .minigrafico text { font: 10px var(--corpo); fill: var(--texto-suave); }
+  .minigrafico { display: block; width: 100%; height: auto; }
+  .minigrafico text { font: 12px var(--corpo); fill: var(--texto-suave); }
+  .minigrafico text.eixo-y { font-weight: 600; fill: var(--texto); }
+  .minigrafico text.rotulo-linha { font-weight: 600; }
   .minigrafico line { stroke: var(--duna); stroke-width: 1; }
-  .mini-legenda { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; margin: 2px 0 4px; }
-  .mini-legenda span::before { content: ""; display: inline-block; width: 14px; height: 0; margin: 0 4px 3px 0;
-                               border-top: 2.5px solid var(--cor); vertical-align: middle; }
-  .mini-legenda span.tracejada::before { border-top: 2px dashed var(--cor); }
-  .popup-areal small { color: var(--texto-suave); font-size: 11px; }
+  .popup-areal small { display: block; color: var(--texto-suave); font-size: 12px; line-height: 1.35; }
+  .aviso-zoom { position: absolute; z-index: 1000; top: 12px; right: 60px; width: max-content;
+                max-width: 240px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+                padding: 8px 12px; border-radius: 14px; background: var(--superficie); color: var(--texto);
+                box-shadow: var(--sombra); font-size: 12.5px; line-height: 1.35; text-align: center; }
+  .aviso-zoom[hidden] { display: none; }
+  .aviso-zoom button { font: 600 12.5px var(--corpo); padding: 4px 12px; border-radius: 999px; border: none;
+                       background: var(--roxo); color: var(--sobre-acento); cursor: pointer; }
+  .legenda .leg-cabecalho { font-size: 11.5px; color: var(--texto-suave); padding-bottom: 2px; }
+  .legenda .leg-cabecalho .km { font-weight: 600; }
   .linha-tempo { display: flex; flex-direction: column; gap: 4px; }
   .tempo { display: flex; align-items: center; gap: 8px; }
   .controles .tempo input[type=range] { flex: 1; width: auto; min-width: 0; }
@@ -662,6 +686,7 @@ MODELO = r"""<!doctype html>
     .cartao b { font-size: 26px; }
     .controles { left: 8px; top: 8px; }
     .legenda { left: 8px; bottom: 8px; max-width: calc(100% - 140px); }
+    .aviso-zoom { top: auto; bottom: 64px; right: 8px; max-width: 170px; }
     .legenda-indice { left: 8px; bottom: 8px; width: auto; max-width: calc(100% - 140px); }
     .coluna-mapa.tela-cheia .legenda { max-width: 260px; }
     .barra-linha { grid-template-columns: 96px 1fr 96px; font-size: 13px; }
@@ -695,6 +720,7 @@ MODELO = r"""<!doctype html>
         </div>
       </div>
       <label class="check-ref"><input type="checkbox" id="ref-limites" checked> Limites do RS e dos estados (IBGE)</label>
+      <label class="check-ref"><input type="checkbox" id="ref-municipios" checked> Municípios do RS (IBGE)</label>
       <label>Opacidade das classes<input type="range" id="opacidade" min="0" max="100" value="75"></label>
       <label>Comparar lado a lado com<select class="seletor" id="comparar-com">__OPCOES_COMPARAR__</select></label>
       </div>
@@ -703,9 +729,11 @@ MODELO = r"""<!doctype html>
     <div class="linha" id="linha" hidden></div>
     <span class="lado" id="lado-esq" style="left: 12px" hidden>Este mapa</span>
     <span class="lado" id="lado-dir" style="right: 12px" hidden></span>
+    <div class="aviso-zoom" id="aviso-zoom" hidden><span>Aproxime o mapa para clicar nas manchas de areal</span>
+      <button type="button" id="ir-mancha">Ir até uma mancha</button></div>
     <details class="painel legenda" id="legenda" open>
       <summary>Legenda</summary>
-      <ul>__LEGENDA__<li id="leg-outras" hidden><span class="cor" style="background:__COR_OUTRAS__"></span>Outras classes do MapBiomas</li></ul>
+      <ul><li class="leg-cabecalho"><span>Classe</span><span class="km">Área na bacia</span></li>__LEGENDA__<li id="leg-outras" hidden><span class="cor" style="background:__COR_OUTRAS__"></span>Outras classes do MapBiomas</li></ul>
     </details>
     <div class="painel legenda-indice" id="legenda-indice" hidden aria-live="polite">
       <div class="li-topo"><div><b id="li-nome"></b><span class="li-periodo" id="li-periodo"></span></div>
@@ -754,9 +782,9 @@ __VENTO__
   </div>
   <p class="dica"><b>O mapa acompanha o texto:</b> ao rolar, ele muda de camada e de enquadramento a cada seção. Se você
   mexer no mapa, a condução automática pausa até a próxima seção. Para conferir o resultado, use o fundo
-  <b>Sentinel-2 __ANO__</b>, mova o <b>período da imagem</b> pelos bimestres (o areal fica exposto o ano todo, mas a lavoura
-  só em parte dele) e compare lado a lado com o MapBiomas. A partir do zoom 14, as manchas de areal ganham contorno e
-  mostram a área ao clicar.</p>
+  <b>Sentinel-2 __ANO__</b>, mova o <b>período da imagem</b> pelos bimestres (o areal fica exposto em boa parte do ano, na mediana em __FREQ_AREAL__, contra
+  __FREQ_LAVOURA__ na lavoura) e compare lado a lado com o MapBiomas. Ao aproximar o mapa, as manchas de areal ganham contorno e
+  mostram os detalhes ao clicar.</p>
 </section>
 
 <section class="secao" id="contexto">
@@ -769,7 +797,7 @@ __VENTO__
   <p>Este projeto mapeia os areais existentes em __ANO__ na ottobacia <b>Miracatu-Taquari</b> (código 682636, nível 6 da ANA,
   __AREA_TOTAL__ km², entre Manoel Viana e São Francisco de Assis, sudoeste do RS) com imagens Sentinel-2 a 10 m e
   Random Forest. A diferença em relação aos mapeamentos anteriores é usar a <b>série do ano inteiro</b>: o areal fica
-  exposto quase o ano todo, e a lavoura só em parte dele.</p>
+  exposto em boa parte do ano, na mediana em __FREQ_AREAL__, contra __FREQ_LAVOURA__ na lavoura.</p>
   <div class="grade">
     <div class="cartao-texto">
       <h3>Objetivos de Desenvolvimento Sustentável</h3>
@@ -830,8 +858,8 @@ __VENTO__
       <span class="marco-autor">Este projeto</span>
       <b class="marco-papel">A síntese</b>
       <p>Este projeto aplica o método de Rayne et al. ao problema descrito por Suertegaray e por Souza e Pires, com
-      Sentinel-2 a 10 m e a série do ano inteiro. O areal fica exposto em quase todas as cenas, a lavoura só em parte
-      delas, e é essa diferença que separa as duas classes.</p>
+      Sentinel-2 a 10 m e a série do ano inteiro. O areal fica exposto em boa parte do ano, na mediana em __FREQ_AREAL__, contra
+      __FREQ_LAVOURA__ na lavoura, e é essa diferença que separa as duas classes.</p>
     </div></li>
   </ol>
   <h3>Comparação rápida</h3>
@@ -860,9 +888,12 @@ __VENTO__
       <tr><td>Limite da ottobacia 682636</td><td>ANA – Base Hidrográfica Ottocodificada</td><td>Recorte da área de estudo</td></tr>
       <tr><td>MapBiomas 10 m, Coleção 4</td><td>MapBiomas</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
       <tr><td>Mapeamento de areais do RS (2020)</td><td>SEMA-RS</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
+      <tr><td>Malhas territoriais do Brasil, do RS e dos municípios</td><td>IBGE</td><td>Referência no mapa</td></tr>
       <tr><td>Amostras rotuladas (polígonos)</td><td>Interpretação visual neste projeto</td><td>Treino e teste</td></tr>
     </tbody>
   </table></div>
+  <p class="nota">Todos os dados de entrada são públicos. As amostras rotuladas estão publicadas no GitHub sob licença
+  CC BY 4.0.</p>
   <p class="nota">O MapBiomas e a SEMA-RS ajudaram a localizar os areais, mas nunca foram usados como rótulo direto:
   cada amostra foi conferida na imagem de alta resolução e nas seis medianas bimestrais do Sentinel-2.</p>
 </section>
@@ -888,8 +919,8 @@ __VENTO__
 
   <h3>Por que a série do ano inteiro separa areal e lavoura</h3>
   <p>Numa única data, areal e lavoura em preparo de solo são parecidos. No ano, não: o areal fica exposto em boa parte
-  das cenas e tem NDVI baixo e estável, enquanto a lavoura alterna solo exposto e vegetação densa. Talhões expostos quase o ano
-  todo (pousio, palhada) foram treinados como uma subclasse, <b>Lavoura exposta</b>, e juntados à Lavoura no mapa final.
+  do ano, na mediana em __FREQ_AREAL__, contra __FREQ_LAVOURA__ na lavoura, que alterna solo exposto e vegetação densa. Talhões expostos
+  por mais tempo (pousio, palhada, na mediana em __FREQ_LAV_EXP__ das cenas) foram treinados como uma subclasse, <b>Lavoura exposta</b>, e juntados à Lavoura no mapa final.
   O gráfico mostra a mediana de cada classe nas amostras (barra) e o intervalo entre os quartis 25% e 75% (traço).</p>
   <div class="abas" id="abas-assinatura" role="tablist" aria-label="Variável"></div>
   <div id="grafico-assinatura"></div>
@@ -911,6 +942,9 @@ __VENTO__
   __VAR_DIVISAO__, escolhidos por validação cruzada espacial de 5 dobras (F1 macro de __F1_CV__ ± __F1_CV_DP__).
   O Random Forest funciona bem com poucas centenas de polígonos e variáveis tabulares, é robusto a variáveis
   correlacionadas, indica a importância de cada variável e roda no próprio Earth Engine.</p>
+  <p>Deep Learning foi descartado porque exige milhares de imagens rotuladas de areais, que não existem para a região.
+  Como limitação, o Random Forest classifica cada pixel isoladamente e não usa forma nem textura, o que contribui para
+  a confusão com talhões expostos.</p>
   <p>Depois da classificação, um filtro espacial remove o salpicado de pixels soltos: manchas de Silvicultura e de
   Vegetação Nativa menores que 1 ha (as duas classes são espectralmente parecidas e trocavam pixels entre si) e
   manchas de Água menores que 0,2 ha passam para a classe predominante ao redor. Uma mata nativa pequena só vira
@@ -976,7 +1010,8 @@ __VENTO__
     <p>Os solos do substrato arenoso da bacia são "muito frágeis e altamente suceptíveis [sic] à erosão hídrica"
     (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>): quando a cobertura é removida, a "expansão lateral e remontante das ravinas e
     voçorocas, promove a formação do areal propriamente dito" (<a class="cita" href="#ref-suertegaray2011">idem</a>), e a "constante mobilidade dos sedimentos"
-    dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>). Por isso, as manchas de solo arenoso exposto
+    dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>).</p>
+    <p>Por isso, as manchas de solo arenoso exposto
     encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>. Parte ainda pode
     ser manejo (pousio, preparo do solo), e a confirmação em campo é o próximo passo.</p>
   </div>
@@ -995,7 +1030,7 @@ __VENTO__
     estratificada sobre o mapa permitiria estimar a acurácia sem esse viés e corrigir a área por classe
     (<a class="cita" href="#ref-olofsson2014">Olofsson et al., 2014</a>).</li>
     <li>A área é a contagem de pixels e ainda não tem intervalo de confiança.</li>
-    <li>Talhões expostos quase o ano todo ainda podem se parecer com areal. Variáveis de textura ou classificação por
+    <li>Talhões expostos por mais tempo que a lavoura comum ainda podem se parecer com areal. Variáveis de textura ou classificação por
     objetos (segmentação) podem reduzir essa confusão.</li>
     <li>O Campo é a classe com menor acerto e se confunde com lavoura e com areais revegetados.</li>
     <li>A Água ainda ocupa mais área que no MapBiomas: quase toda a água real é encontrada, mas banhados, várzeas e
@@ -1152,12 +1187,37 @@ const classes = L.imageOverlay(URL_CLASSES, limites, { pane: "classes", opacity:
 const areal = L.imageOverlay("areal___ANO__.png", limites, { pane: "areal", opacity: 1 }).addTo(mapa);
 const mapbiomas = __TEM_MB__ ? L.imageOverlay("mapbiomas___ANO__.png", limites, { pane: "mapbiomas", opacity: 0.75 }) : null;
 
+// Com o balão aberto, os painéis do mapa ficam recolhidos para não cobri-lo e voltam ao estado anterior ao fechar
+const paineisMapa = ["controles", "legenda"].map((id) => document.getElementById(id));
+let estadoPaineis = null;
+function recolherPaineis() {
+  if (!estadoPaineis) estadoPaineis = paineisMapa.map((p) => p.open);
+  paineisMapa.forEach((p) => { p.open = false; });
+}
+mapa.on("popupclose", () => {
+  // espera um instante: ao trocar de mancha, o balão novo abre logo depois de o anterior fechar
+  setTimeout(() => {
+    if (estadoPaineis && !document.querySelector(".leaflet-popup")) {
+      paineisMapa.forEach((p, i) => { p.open = estadoPaineis[i]; });
+      estadoPaineis = null;
+    }
+  }, 50);
+});
+// Contorno das manchas: vermelho-escuro sobre as classes e o satélite, branco sobre os índices
+const estiloContorno = () => ({ color: INDICES[indiceAtual] ? "#FFFFFF" : "#8A2A12", weight: 1.5, opacity: 1,
+                                fillColor: INDICES[indiceAtual] ? "#FFFFFF" : "#8A2A12", fillOpacity: 0 });
 const contornos = L.geoJSON(null, {
   pane: "areal",
-  style: { color: "#8A2A12", weight: 0.5, fillOpacity: 0 },
+  style: estiloContorno,
   onEachFeature: (f, camada) => {
-    camada.bindPopup(() => conteudoPopup(f.properties), { maxWidth: 300 });
+    // No celular o mapa ocupa só 45% da tela: o balão ganha rolagem para caber nele
+    const alturaMax = window.matchMedia("(max-width: 899px)").matches ? Math.round(window.innerHeight * 0.45 - 120) : null;
+    camada.bindPopup(() => conteudoPopup(f.properties), { maxWidth: Math.min(320, window.innerWidth - 90), minWidth: 260, maxHeight: alturaMax,
+                                                          autoPanPaddingTopLeft: [10, 56], autoPanPaddingBottomRight: [10, 56] });
+    camada.on("mouseover", () => camada.setStyle({ weight: 2.5, fillOpacity: 0.22 }));
+    camada.on("mouseout", () => camada.setStyle(estiloContorno()));
     camada.on("popupopen", (e) => {
+      recolherPaineis();
       // Abas NDVI / NDWI / BSI dentro do balão: troca só o gráfico, sem recriar o balão (o Leaflet fecharia o
       // balão ao ver um clique num botão que saiu da página)
       e.popup.getElement().onclick = (ev) => {
@@ -1168,6 +1228,7 @@ const contornos = L.geoJSON(null, {
         caixa.querySelectorAll(".mini-aba").forEach((o) => o.setAttribute("aria-pressed", o === b));
         const serie = typeof f.properties.s === "string" ? JSON.parse(f.properties.s) : f.properties.s;
         caixa.querySelector(".minigrafico").outerHTML = miniGrafico(serie, b.dataset.ind);
+        caixa.querySelector(".como-ler").innerHTML = COMO_LER[b.dataset.ind];
       };
     });
   },
@@ -1191,46 +1252,99 @@ lerGeoJSON("rs.geojson", contornoRS);
 document.getElementById("ref-limites").addEventListener("change", (e) => {
   if (e.target.checked) limitesRef.addTo(mapa); else limitesRef.remove();
 });
-lerGeoJSON("areais___ANO__.geojson", contornos);
+// Municípios do RS (malha do IBGE): limites finos e destaque, com o nome, para os municípios em que a bacia está
+const municipios = L.layerGroup().addTo(mapa);
+const malhaMunicipios = L.geoJSON(null, {
+  pane: "referencia", interactive: false,
+  style: (f) => (f.properties.km2
+    ? { color: "#FFD166", weight: 2, opacity: 1, fillColor: "#FFD166", fillOpacity: 0.08 }
+    : { color: "#F2F2F2", weight: 0.6, opacity: 0.55, fill: false }),
+  onEachFeature: (f) => {
+    if (!f.properties.rotulo) return;
+    L.tooltip({ permanent: true, direction: "center", className: "rotulo-municipio", interactive: false })
+      .setLatLng(f.properties.rotulo)
+      .setContent(`${f.properties.nome}<span>${fmt(f.properties.km2, 0)} km² na bacia</span>`)
+      .addTo(municipios);
+  },
+}).addTo(municipios);
+lerGeoJSON("municipios_rs.geojson", malhaMunicipios);
+document.getElementById("ref-municipios").addEventListener("change", (e) => {
+  if (e.target.checked) municipios.addTo(mapa); else municipios.remove();
+});
+lerGeoJSON("areais___ANO__.geojson", contornos).then(() => atualizarContornos());
 
+const avisoZoom = document.getElementById("aviso-zoom");
 function atualizarContornos() {
   const ind = INDICES[indiceAtual];
-  contornos.setStyle(ind ? { color: ind.contorno, weight: 1, opacity: 0.9 } : { color: "#8A2A12", weight: 0.5, opacity: 1 });
-  if (ind || mapa.getZoom() >= 14) contornos.addTo(mapa); else contornos.remove();
+  contornos.setStyle(estiloContorno());
+  // Sombra escura sob o contorno branco, para ele aparecer também nos tons claros dos índices
+  mapa.getPane("areal").style.filter = ind ? "drop-shadow(0 0 1px rgba(0, 0, 0, 0.85))" : "";
+  const visiveis = !!ind || mapa.getZoom() >= 14;
+  if (visiveis) contornos.addTo(mapa); else contornos.remove();
+  avisoZoom.hidden = visiveis || !contornos.getLayers().length;
 }
+// "Ir até uma mancha": voa até a maior mancha de areal e abre o balão dela
+document.getElementById("ir-mancha").addEventListener("click", () => {
+  const maior = contornos.getLayers().reduce((a, b) => (b.feature.properties.area_ha > a.feature.properties.area_ha ? b : a));
+  mapa.once("moveend", () => maior.openPopup());
+  mapa.flyToBounds(maior.getBounds(), { maxZoom: 16, padding: [40, 40] });
+});
 
 // Minigráfico das medianas bimestrais de uma mancha de areal, com as curvas típicas de Lavoura e Campo
 const NOMES_INDICE = { ndvi: "NDVI", ndwi: "NDWI", bsi: "BSI" };
-const BIMESTRES_CURTOS = ["J–F", "M–A", "M–J", "J–A", "S–O", "N–D"];
+const EIXO_Y = { ndvi: "NDVI ↑ mais vegetação", ndwi: "NDWI ↑ mais água", bsi: "BSI ↑ mais solo exposto" };
+const BIMESTRES_CURTOS = ["jan–fev", "mar–abr", "mai–jun", "jul–ago", "set–out", "nov–dez"];
+const COMO_LER = {
+  ndvi: "<b>Como ler:</b> no areal, a linha laranja fica baixa e quase plana o ano todo. Na lavoura, ela sobe na safra e cai depois da colheita.",
+  ndwi: "<b>Como ler:</b> valores abaixo de zero indicam ausência de água. Linhas próximas mostram que a mancha não é corpo d'água.",
+  bsi: "<b>Como ler:</b> quanto mais alto, mais solo à mostra. O areal fica acima da lavoura e do campo na maior parte do ano.",
+};
 function miniGrafico(serie, nome) {
   // Faixa do minigráfico: a mesma para todas as manchas, ajustada aos valores das manchas e das curvas típicas
   const [gmin, gmax] = (INDICES[nome] && INDICES[nome].grafico) || [-1, 1];
   const ind = { min: gmin, max: gmax };
-  const L = 260, A = 132, m = { e: 34, d: 8, t: 8, b: 22 };
+  const L = 300, A = 202, m = { e: 34, d: 96, t: 24, b: 44 };
   const x = (i) => m.e + (i * (L - m.e - m.d)) / 5;
   const y = (v) => m.t + (1 - (Math.min(Math.max(v, ind.min), ind.max) - ind.min) / (ind.max - ind.min)) * (A - m.t - m.b);
-  const linha = (vals, cor, tracejada) => (vals && vals.length === 6 && vals.every((v) => v !== null))
-    ? `<polyline fill="none" stroke="${cor}" stroke-width="${tracejada ? 1.8 : 2.8}" stroke-linejoin="round"${tracejada ? ' stroke-dasharray="4 3"' : ""} points="${vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"/>`
-    : "";
+  const completa = (vals) => vals && vals.length === 6 && vals.every((v) => v !== null);
+  const linhas = [
+    { vals: TIPICAS.Campo && TIPICAS.Campo[nome], cor: "#6E8F3A", tracejada: true, rotulo: "Campo típico" },
+    { vals: TIPICAS.Lavoura && TIPICAS.Lavoura[nome], cor: "#B08A2E", tracejada: true, rotulo: "Lavoura típica" },
+    { vals: serie && serie[nome], cor: "#E4572E", tracejada: false, rotulo: "esta mancha" },
+  ].filter((l) => completa(l.vals));
+  const desenho = linhas.map((l) => `<polyline fill="none" stroke="${l.cor}" stroke-width="${l.tracejada ? 1.8 : 2.8}" stroke-linejoin="round"${l.tracejada ? ' stroke-dasharray="4 3"' : ""} points="${l.vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"/>`).join("");
+  // Rótulo na ponta de cada linha, afastando os que ficariam sobrepostos (no mínimo 14 px entre eles)
+  const pontas = linhas.map((l) => ({ ...l, yr: y(l.vals[5]) })).sort((a, b) => a.yr - b.yr);
+  pontas.forEach((p, i) => { if (i && p.yr - pontas[i - 1].yr < 14) p.yr = pontas[i - 1].yr + 14; });
+  const excesso = pontas.length ? pontas[pontas.length - 1].yr - (A - m.b) : 0;
+  if (excesso > 0) pontas.forEach((p) => { p.yr -= excesso; });
+  const rotulos = pontas.map((p) => `<text class="rotulo-linha" x="${x(5) + 6}" y="${(p.yr + 4).toFixed(1)}" style="fill:${p.cor}">${p.rotulo}</text>`).join("");
   const marcas = [ind.min, (ind.min + ind.max) / 2, ind.max].map((v) =>
-    `<line x1="${m.e}" x2="${L - m.d}" y1="${y(v)}" y2="${y(v)}"/><text x="${m.e - 4}" y="${y(v) + 3}" text-anchor="end">${fmt(v, 1)}</text>`).join("");
-  const meses = BIMESTRES_CURTOS.map((r, i) => `<text x="${x(i)}" y="${A - 6}" text-anchor="middle">${r}</text>`).join("");
+    `<line x1="${m.e}" x2="${x(5)}" y1="${y(v)}" y2="${y(v)}"/><text x="${m.e - 4}" y="${y(v) + 4}" text-anchor="end">${fmt(v, 1)}</text>`).join("");
+  // Bimestres em duas alturas alternadas, para caberem por extenso sem se sobrepor
+  const meses = BIMESTRES_CURTOS.map((r, i) => `<text x="${x(i)}" y="${A - m.b + 21 + (i % 2) * 15}" text-anchor="middle">${r}</text>`).join("");
   return `<svg class="minigrafico" viewBox="0 0 ${L} ${A}" role="img" aria-label="${NOMES_INDICE[nome]} por bimestre: esta mancha, Lavoura típica e Campo típico">`
-    + marcas + meses
-    + linha(TIPICAS.Campo && TIPICAS.Campo[nome], "#6E8F3A", true)
-    + linha(TIPICAS.Lavoura && TIPICAS.Lavoura[nome], "#B08A2E", true)
-    + linha(serie && serie[nome], "#E4572E", false) + "</svg>";
+    + `<text class="eixo-y" x="0" y="13">${EIXO_Y[nome]}</text>`
+    + marcas + meses + desenho + rotulos + "</svg>";
 }
+const pct = (v) => `${Math.round(100 * v)}%`;
 function conteudoPopup(props, nome) {
   nome = nome || (NOMES_INDICE[indiceAtual] ? indiceAtual : "ndvi");
-  let corpo = `<b>Areal: ${fmt(props.area_ha)} ha</b>`;
+  let corpo = `<b class="titulo-mancha">Mancha de areal · ${fmt(props.area_ha)} ha</b>`;
+  const numeros = [];
+  if (props.f !== undefined && props.f !== null) {
+    const tipica = TIPICAS.Lavoura && TIPICAS.Lavoura.freq;
+    numeros.push(`Exposta em ${pct(props.f)} das cenas de __ANO__` + (tipica !== undefined ? ` (lavoura típica: ${pct(tipica)})` : ""));
+  }
+  const mb = typeof props.mb === "string" ? JSON.parse(props.mb) : props.mb;
+  if (mb && mb.length) numeros.push(`No MapBiomas: ${mb.map(([classe, p]) => `${p}% ${classe}`).join(" · ")}`);
+  if (numeros.length) corpo += `<p class="mini-numeros">${numeros.map((n) => `<span>${n}</span>`).join("")}</p>`;
   const serie = typeof props.s === "string" ? JSON.parse(props.s) : props.s;
   if (serie) {
     corpo += `<div class="mini-abas">${Object.keys(NOMES_INDICE).map((k) =>
       `<button type="button" class="mini-aba" data-ind="${k}" aria-pressed="${k === nome}">${NOMES_INDICE[k]}</button>`).join("")}</div>`
       + miniGrafico(serie, nome)
-      + `<div class="mini-legenda"><span style="--cor:#E4572E">esta mancha</span>`
-      + `<span class="tracejada" style="--cor:#B08A2E">Lavoura típica</span><span class="tracejada" style="--cor:#6E8F3A">Campo típico</span></div>`
+      + `<p class="como-ler">${COMO_LER[nome]}</p>`
       + `<small>Medianas bimestrais de __ANO__. Lavoura e Campo típicos são a mediana dos polígonos de amostra.</small>`;
   }
   return `<div class="popup-areal">${corpo}</div>`;
