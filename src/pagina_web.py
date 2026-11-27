@@ -524,7 +524,6 @@ MODELO = r"""<!doctype html>
 
   /* ------------------------------------------------ Texto */
   .secao { padding: 28px 32px 0; }
-  .secao > p, .secao li { max-width: 68ch; }
   .dica { font-size: 13px; color: var(--texto-suave); }
   .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
   .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 20px; }
@@ -537,7 +536,8 @@ MODELO = r"""<!doctype html>
   .lista-ods li { margin: 4px 0; }
   figure { margin: 16px 0; }
   figure img { width: 100%; border-radius: 14px; }
-  figcaption { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
+  figcaption { font-size: 13px; color: var(--texto-suave); margin: 6px auto 0; text-align: center; }
+  .figura-matriz figcaption { max-width: 560px; }
   .figura-matriz img { display: block; max-width: 560px; margin: 0 auto; background: #fff; }
 
   table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--fundo); }
@@ -595,7 +595,9 @@ MODELO = r"""<!doctype html>
   .balao .botao-doi { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; background: var(--roxo);
                       color: var(--sobre-acento); text-decoration: none; font-weight: 600; }
 
-  .passos { list-style: none; counter-reset: passo; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .passos { list-style: none; counter-reset: passo; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 640px) { .passos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 420px) { .passos { grid-template-columns: 1fr; } }
   .passos li { counter-increment: passo; background: var(--superficie); border-radius: 14px; padding: 14px 16px; box-shadow: var(--sombra); }
   .passos li::before { content: counter(passo); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px;
                        border: 2px solid var(--roxo); color: var(--roxo); font: 600 13px var(--titulo); margin-bottom: 8px; }
