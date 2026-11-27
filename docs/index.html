@@ -192,8 +192,23 @@
   .secao > p.dica, .secao > p.nota { max-width: none; font-size: 12.5px; font-style: italic; }
   .grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (max-width: 560px) { .grade-2 { grid-template-columns: 1fr; } }
-  .lista-ods { margin: 0; padding-left: 18px; }
-  .lista-ods li { margin: 4px 0; }
+  /* ODS: itens recolhíveis (details), com o número num selo */
+  .ods { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .ods-item { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); }
+  .ods-item summary { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+  .ods-item summary::-webkit-details-marker { display: none; }
+  .ods-item summary::after { content: "+"; margin-left: auto; font: 600 18px var(--titulo); color: var(--link); }
+  .ods-item[open] summary::after { content: "−"; }
+  .ods-selo { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+              font: 700 15px var(--titulo); background: var(--duna); color: var(--texto); }
+  .ods-selo.destaque { background: var(--roxo); color: var(--sobre-acento); }
+  .ods-texto b { display: block; font-family: var(--titulo); font-size: 15px; }
+  .ods-texto span { font-size: 13.5px; color: var(--texto-suave); }
+  .ods-corpo { padding: 0 14px 12px 60px; }
+  .ods-corpo blockquote { margin: 0 0 8px; padding-left: 12px; border-left: 3px solid var(--duna); font-style: italic;
+                          font-size: 14px; color: var(--texto-suave); }
+  .ods-corpo p { margin: 0; font-size: 14.5px; }
+  @media (max-width: 600px) { .ods-corpo { padding-left: 14px; } }
   figure { margin: 16px 0; }
   figure img { width: 100%; border-radius: 14px; }
   figcaption { font-size: 13px; color: var(--texto-suave); margin: 6px auto 0; text-align: center; }
@@ -423,16 +438,44 @@
   589 km², entre Manoel Viana e São Francisco de Assis, sudoeste do RS) com imagens Sentinel-2 a 10 m e
   Random Forest. A diferença em relação aos mapeamentos anteriores é usar a <b>série do ano inteiro</b>: o areal fica
   exposto em boa parte do ano, na mediana em metade das cenas, contra 13% na lavoura.</p>
+  <h3>Objetivos de Desenvolvimento Sustentável</h3>
+  <div class="ods">
+    <details class="ods-item">
+      <summary><span class="ods-selo destaque">15</span><span class="ods-texto"><b>Vida Terrestre · meta 15.3</b>
+        <span>Mede a degradação do solo na bacia: 5,0% em areal.</span></span></summary>
+      <div class="ods-corpo">
+        <blockquote>"Até 2030, combater a desertificação, restaurar a terra e o solo degradado, incluindo terrenos
+        afetados pela desertificação, secas e inundações, e lutar para alcançar um mundo neutro em termos de
+        degradação do solo." (<a class="cita" href="#ref-onu-ods">Nações Unidas Brasil</a>)</blockquote>
+        <p><b>No projeto:</b> o areal é a forma mais visível de degradação do solo no Pampa. O inventário mede a
+        proporção da bacia degradada, a mesma ideia do indicador da meta, e mostra onde priorizar manejo e
+        recuperação.</p>
+      </div>
+    </details>
+    <details class="ods-item">
+      <summary><span class="ods-selo">2</span><span class="ods-texto"><b>Fome Zero e Agricultura Sustentável · meta 2.4</b>
+        <span>Solos arenosos frágeis dentro das lavouras.</span></span></summary>
+      <div class="ods-corpo">
+        <blockquote>"Até 2030, garantir sistemas sustentáveis de produção de alimentos e implementar práticas agrícolas
+        resilientes (...) que melhorem progressivamente a qualidade da terra e do solo."
+        (<a class="cita" href="#ref-onu-ods">Nações Unidas Brasil</a>)</blockquote>
+        <p><b>No projeto:</b> a arenização reduz a área útil para a pecuária e a lavoura. O mapa mostra
+        8,2 km² de areal sobre lavoura do MapBiomas, e a conferência visual encontrou solo arenoso exposto
+        em 42 de 50 manchas.</p>
+      </div>
+    </details>
+    <details class="ods-item">
+      <summary><span class="ods-selo">13</span><span class="ods-texto"><b>Ação contra a Mudança Global do Clima · meta 13.1</b>
+        <span>Linha de base para acompanhar o efeito de chuvas intensas e do vento.</span></span></summary>
+      <div class="ods-corpo">
+        <blockquote>"Reforçar a resiliência e a capacidade de adaptação a riscos relacionados ao clima e às catástrofes
+        naturais em todos os países." (<a class="cita" href="#ref-onu-ods">Nações Unidas Brasil</a>)</blockquote>
+        <p><b>No projeto:</b> chuvas intensas abrem ravinas e voçorocas e o vento espalha a areia. O inventário de
+        2025 permite acompanhar essa resposta, repetindo o mesmo fluxo em outros anos.</p>
+      </div>
+    </details>
+  </div>
   <div class="grade">
-    <div class="cartao-texto">
-      <h3>Objetivos de Desenvolvimento Sustentável</h3>
-      <ul class="lista-ods">
-        <li><b>ODS 15 – Vida Terrestre</b>, meta 15.3: saber onde estão os areais é o primeiro passo para priorizar
-        manejo e recuperação.</li>
-        <li><b>ODS 2</b>: a arenização reduz a área útil para pecuária e lavoura.</li>
-        <li><b>ODS 13</b>: o inventário é a linha de base para acompanhar o efeito de chuvas intensas e do vento.</li>
-      </ul>
-    </div>
     <div class="cartao-texto">
       <h3>Produtos</h3>
       <p>Mapa de classificação de 2025 (GeoTIFF, 10 m), polígonos de areais (shapefile), código aberto e
@@ -683,6 +726,7 @@
   <ul class="nota">
     <li>MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Disponível em: brasil.mapbiomas.org.</li>
     <li id="ref-mcfeeters1996" data-doi="10.1080/01431169608948714">McFEETERS, S. K. The use of the Normalized Difference Water Index (NDWI) in the delineation of open water features. <i>International Journal of Remote Sensing</i>, v. 17, n. 7, p. 1425–1432, 1996.</li>
+    <li id="ref-onu-ods">NAÇÕES UNIDAS BRASIL. Objetivos de Desenvolvimento Sustentável. Disponível em: <a href="https://brasil.un.org/pt-br/sdgs">https://brasil.un.org/pt-br/sdgs</a>.</li>
     <li id="ref-olofsson2014" data-doi="10.1016/j.rse.2014.02.015">OLOFSSON, P. et al. Good practices for estimating area and assessing accuracy of land change. <i>Remote Sensing of Environment</i>, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.</li>
     <li id="ref-rayne2023" data-doi="10.1038/s41598-023-46319-1">RAYNE, L. et al. Detecting desertification in the ancient oases of southern Morocco. <i>Scientific Reports</i>, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.</li>
     <li id="ref-rikimaru2002">RIKIMARU, A.; ROY, P. S.; MIYATAKE, S. Tropical forest cover density mapping. <i>Tropical Ecology</i>, v. 43, n. 1, p. 39–47, 2002.</li>

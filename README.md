@@ -22,9 +22,11 @@ Mapear as **áreas de arenização (areais) existentes em 2025** na ottobacia **
 
 ## 2. Relevância para os ODS e para o ecossistema espacial
 
-- **ODS 15 – Vida Terrestre**, meta 15.3 (combater a degradação do solo): saber onde estão os areais é o primeiro passo para priorizar manejo e recuperação.
-- **ODS 2 – Fome Zero e Agricultura Sustentável:** a arenização reduz a área útil para pecuária e lavoura, e o mapa orienta o manejo do solo.
-- **ODS 13 – Ação Climática:** os areais respondem a chuvas intensas e ao vento, e o inventário é a linha de base para monitorar esses efeitos.
+Metas oficiais em NAÇÕES UNIDAS BRASIL (s.d.).
+
+- **ODS 15 – Vida Terrestre, meta 15.3:** o areal é a forma mais visível de degradação do solo no Pampa. O inventário mede a proporção da bacia degradada (5,0% em areal), a mesma ideia do indicador da meta, e mostra onde priorizar manejo e recuperação.
+- **ODS 2 – Fome Zero e Agricultura Sustentável, meta 2.4:** a arenização reduz a área útil para a pecuária e a lavoura. O mapa mostra 8,2 km² de areal sobre lavoura do MapBiomas, e a conferência visual encontrou solo arenoso exposto em 42 de 50 manchas.
+- **ODS 13 – Ação contra a Mudança Global do Clima, meta 13.1:** chuvas intensas abrem ravinas e voçorocas e o vento espalha a areia. O inventário de 2025 permite acompanhar essa resposta, repetindo o mesmo fluxo em outros anos.
 
 **Contribuição prática.** O inventário serve de base de validação para mapas de suscetibilidade à arenização e oferece ao ecossistema geoespacial um fluxo aberto e reprodutível para mapear areais com Sentinel-2.
 
@@ -312,6 +314,7 @@ A primeira versão do mapa tinha acurácia de teste acima de 0,90, mas classific
 
 - McFEETERS, S. K. The use of the Normalized Difference Water Index (NDWI) in the delineation of open water features. *International Journal of Remote Sensing*, v. 17, n. 7, p. 1425–1432, 1996. DOI: 10.1080/01431169608948714.
 - MAPBIOMAS. Pampa – Appendix, ATBD Collection 11 e MapBiomas 10 m Collection 4. Código: github.com/mapbiomas/brazil-pampa. Disponível em: brasil.mapbiomas.org.
+- NAÇÕES UNIDAS BRASIL. Objetivos de Desenvolvimento Sustentável. Disponível em: https://brasil.un.org/pt-br/sdgs.
 - OLOFSSON, P.; FOODY, G. M.; HEROLD, M. et al. Good practices for estimating area and assessing accuracy of land change. *Remote Sensing of Environment*, v. 148, p. 42–57, 2014. DOI: 10.1016/j.rse.2014.02.015.
 - RAYNE, L.; BRANDOLINI, F.; MAKOVICS, J. L. et al. Detecting desertification in the ancient oases of southern Morocco. *Scientific Reports*, v. 13, 2023. DOI: 10.1038/s41598-023-46319-1.
 - RIKIMARU, A.; ROY, P. S.; MIYATAKE, S. Tropical forest cover density mapping. *Tropical Ecology*, v. 43, n. 1, p. 39–47, 2002.
