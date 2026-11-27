@@ -1036,8 +1036,8 @@ __VENTO__
     <h3>Onde está o Areal deste mapa, segundo o MapBiomas</h3>
     __EMPILHADA_MB__
     <p>__ACHADO_MB__</p>
-    <p>A conferência visual de 30 a 50 manchas em conflito com a lavoura do MapBiomas mostrou solo arenoso exposto na
-    maior parte delas.</p>
+    <p>A conferência visual de 50 manchas em conflito com a lavoura do MapBiomas mostrou solo arenoso exposto em 42
+    delas (84%). Nas outras 8, a imagem não confirmou areia exposta.</p>
     <p>A literatura sustenta essa leitura. O processo de arenização "poderá ser desencadeado por agentes naturais ou
     atividades humanas" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Numa área piloto entre
     São Francisco de Assis e Manoel Viana, a mesma região desta bacia, na frente de expansão da soja, a análise
@@ -1049,7 +1049,7 @@ __VENTO__
     (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>): quando a cobertura é removida, a "expansão lateral e remontante das ravinas e
     voçorocas, promove a formação do areal propriamente dito" (<a class="cita" href="#ref-suertegaray2011">idem</a>), e a "constante mobilidade dos sedimentos"
     dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>).</p>
-    <p>Por isso, as manchas de solo arenoso exposto
+    <p>Por isso, a maior parte das manchas de solo arenoso
     encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>. Parte ainda pode
     ser manejo (pousio, preparo do solo), e a confirmação em campo é o próximo passo.</p>
   </div>
