@@ -155,6 +155,17 @@ def _matriz_mapbiomas(tabela):
             f'<tbody>{"".join(linhas_html)}</tbody></table>')
 
 
+def arredondar_geojson(texto, casas=6):
+    """Arredonda as coordenadas de um GeoJSON (6 casas ≈ 10 cm), para a página carregar mais leve."""
+    def arred(c):
+        return [arred(v) for v in c] if isinstance(c, list) else round(c, casas)
+    dados = json.loads(texto)
+    for f in dados.get("features", []):
+        if f.get("geometry"):
+            f["geometry"]["coordinates"] = arred(f["geometry"]["coordinates"])
+    return json.dumps(dados, ensure_ascii=False, separators=(",", ":"))
+
+
 def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbiomas, limites, areais_geojson,
                  bacia_geojson, tem_mb, periodos_s2=(), areal_por_mb=None, n_cenas=None, caso_lavoura=None,
                  indices=None, tipicas=None, logos=(),
@@ -268,8 +279,8 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
         f'<span class="km">{br(areas.get(c, 0.0))} km²</span></li>' for c in [1, 2, 3, 4, 5, 6])
 
     # Polígonos em arquivos separados, carregados pela página com fetch()
-    (web / f"areais_{ano}.geojson").write_text(areais_geojson, encoding="utf-8")
-    (web / "bacia.geojson").write_text(bacia_geojson, encoding="utf-8")
+    (web / f"areais_{ano}.geojson").write_text(arredondar_geojson(areais_geojson), encoding="utf-8")
+    (web / "bacia.geojson").write_text(arredondar_geojson(bacia_geojson), encoding="utf-8")
     logos_html = "".join(f'<img src="{a}" alt="{html.escape(alt)}">' for a, alt in logos)
 
     if areal_por_mb:
@@ -376,7 +387,7 @@ MODELO = r"""<!doctype html>
 <meta property="og:title" content="Areais da ottobacia Miracatu-Taquari – __ANO__">
 <meta property="og:description" content="__AREA__ km² de areal (__PCT__% da bacia) mapeados com Sentinel-2 e Random Forest no Pampa gaúcho.">
 <meta property="og:url" content="__SITE__">
-<meta property="og:image" content="__SITE__classes___ANO__.png">
+<meta property="og:image" content="__SITE__localizacao_bacia.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="logo_ftl.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -955,20 +966,19 @@ __VENTO__
     <p>__ACHADO_MB__</p>
     <p>A conferência visual de 30 a 50 manchas em conflito com a lavoura do MapBiomas mostrou solo arenoso exposto na
     maior parte delas.</p>
+    <p>A literatura sustenta essa leitura. O processo de arenização "poderá ser desencadeado por agentes naturais ou
+    atividades humanas" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Numa área piloto entre
+    São Francisco de Assis e Manoel Viana, a mesma região desta bacia, na frente de expansão da soja, a análise
+    multitemporal registrou aumento de 47,52 ha de areais em 25 anos, resultados que "indicam o surgimento de novas
+    manchas de areia (areais)" (Suertegaray, Guasselli e Franz, 1995 apud <a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Ravinas e
+    sulcos também podem resultar do "uso de maquinaria pesada na atividade agrícola"
+    (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 64</a>).</p>
     <p>Os solos do substrato arenoso da bacia são "muito frágeis e altamente suceptíveis [sic] à erosão hídrica"
     (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>): quando a cobertura é removida, a "expansão lateral e remontante das ravinas e
     voçorocas, promove a formação do areal propriamente dito" (<a class="cita" href="#ref-suertegaray2011">idem</a>), e a "constante mobilidade dos sedimentos"
     dificulta a volta da vegetação (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>). Por isso, as manchas de solo arenoso exposto
     encontradas dentro de lavouras são <b>áreas fragilizadas, com possíveis focos de arenização</b>. Parte ainda pode
     ser manejo (pousio, preparo do solo), e a confirmação em campo é o próximo passo.</p>
-    <p>A literatura sustenta essa leitura. A arenização é o "retrabalhamento de depósitos areníticos (pouco
-    consolidados) ou arenosos (não consolidados)" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 62</a>), e "este processo poderá ser
-    desencadeado por agentes naturais ou atividades humanas" (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Numa área piloto entre
-    São Francisco de Assis e Manoel Viana, a mesma região desta bacia, na frente de expansão da soja, a análise
-    multitemporal registrou aumento de 47,52 ha de areais em 25 anos, resultados que "indicam o surgimento de novas
-    manchas de areia (areais)" (Suertegaray, Guasselli e Franz, 1995 apud <a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 69</a>). Ravinas e
-    sulcos também podem resultar do "uso de maquinaria pesada na atividade agrícola"
-    (<a class="cita" href="#ref-suertegaray2011">Suertegaray, 2011, p. 64</a>).</p>
   </div>
   __BLOCO_SEMA__
   <h3>Matriz de concordância</h3>
