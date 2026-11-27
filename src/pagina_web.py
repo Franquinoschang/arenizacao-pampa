@@ -170,7 +170,7 @@ def arredondar_geojson(texto, casas=6):
 
 def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbiomas, limites, areais_geojson,
                  bacia_geojson, tem_mb, periodos_s2=(), areal_por_mb=None, n_cenas=None, caso_lavoura=None,
-                 indices=None, tipicas=None, logos=(),
+                 indices=None, tipicas=None, logos=(), arquivos_amostras=(),
                  repo_url="",
                  site_url="https://franquinoschang.github.io/arenizacao-pampa/"):
     """Gera pasta_web/index.html.
@@ -178,6 +178,8 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
     limites: (oeste, sul, leste, norte) em graus. periodos_s2: [(arquivo, rótulo)] das imagens Sentinel-2 de
     fundo em pasta_web, a mediana do ano primeiro. areal_por_mb: {código MapBiomas: km²} do Areal deste mapa,
     calculado dos GeoTIFFs (opcional; sem ele, usa a tabela de comparação, com "Outras" agrupadas).
+    arquivos_amostras: arquivos de polígonos de amostra (GeoJSON ou shapefile, com a coluna Classvalue), contados
+    por classe na tabela de Dados e ligados ao GitHub.
     """
     proc, web = Path(pasta_processados), Path(pasta_web)
     oeste, sul, leste, norte = limites
@@ -221,6 +223,28 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
     cabecalho_tipicos = "".join(f'<th class="num">{r}</th>' for r in VARIAVEIS_TIPICAS.values())
     tabela_tipicos = (f'<table><thead><tr><th>Classe</th>{cabecalho_tipicos}</tr></thead>'
                       f'<tbody>{"".join(linhas_tipicos)}</tbody></table>')
+    # Polígonos de amostra por classe, lidos dos arquivos de amostras, com link para cada arquivo no GitHub
+    raiz_repo = proc.resolve().parents[1]
+    poligonos_classe, links_amostras = {}, []
+    for arquivo in arquivos_amostras:
+        import geopandas as gpd
+
+        arquivo = Path(arquivo).resolve()
+        for c, n in gpd.read_file(arquivo)["Classvalue"].value_counts().items():
+            poligonos_classe[int(c)] = poligonos_classe.get(int(c), 0) + int(n)
+        relativo = arquivo.relative_to(raiz_repo).as_posix()
+        if arquivo.suffix == ".shp":   # o shapefile são vários arquivos: o link vai para a pasta
+            relativo = arquivo.parent.relative_to(raiz_repo).as_posix()
+        alvo = f"{repo_url}/{'tree' if arquivo.suffix == '.shp' else 'blob'}/main/{relativo}"
+        links_amostras.append(f'<a href="{alvo}">{html.escape(arquivo.name)}</a>')
+    if poligonos_classe:
+        por_classe = ", ".join(f"{nomes_treino[c]} {br(n, 0)}" for c, n in sorted(poligonos_classe.items()) if c in nomes_treino)
+        amostras_dado = (f"Amostras rotuladas: {br(sum(poligonos_classe.values()), 0)} polígonos"
+                         f'<span class="detalhe-dado">{por_classe}</span>')
+        amostras_fonte = "Interpretação visual neste projeto, publicada no GitHub (" + " e ".join(links_amostras) + ")"
+    else:
+        amostras_dado, amostras_fonte = "Amostras rotuladas (polígonos)", "Interpretação visual neste projeto"
+
     # Frequência de solo exposto mediana por classe, citada no texto (sai do mesmo CSV da tabela de valores típicos)
     def pct_freq(c):
         return round(100 * amostras.loc[amostras["classe"] == c, "FREQ_EXPOSTO"].median())
@@ -375,6 +399,8 @@ def gerar_pagina(*, pasta_processados, pasta_web, pasta_figuras, ano, ano_mapbio
         "__TABELA_TIPICOS__": tabela_tipicos,
         "__N_VARIAVEIS__": str(n_variaveis),
         "__N_CENAS_PAR__": f" ({n_cenas})" if n_cenas else "",
+        "__CENAS_S2__": f"{n_cenas} cenas de {ano}" if n_cenas else f"cenas de {ano}",
+        "__AMOSTRAS_DADO__": amostras_dado, "__AMOSTRAS_FONTE__": amostras_fonte,
         "__DADOS__": dados_js,
     }
     pagina = MODELO
@@ -564,6 +590,17 @@ MODELO = r"""<!doctype html>
   .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 20px; }
   .cartao-texto h3:first-child { margin-top: 0; }
   .nota { font-size: 13px; color: var(--texto-suave); }
+  .detalhe-dado { display: block; font-size: 12.5px; color: var(--texto-suave); }
+  /* Celular: cada dado vira um bloco, com o nome da coluna antes de cada valor */
+  @media (max-width: 600px) {
+    .tabela-dados thead { display: none; }
+    .tabela-dados tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--duna); }
+    .tabela-dados td { display: block; border: none; padding: 2px 0; }
+    .tabela-dados td:first-child { font-weight: 600; }
+    .tabela-dados td:nth-child(2)::before { content: "Fonte: "; font-weight: 600; }
+    .tabela-dados td:nth-child(3)::before { content: "Formato e resolução: "; font-weight: 600; }
+    .tabela-dados td:nth-child(4)::before { content: "Uso: "; font-weight: 600; }
+  }
   .secao > p.dica, .secao > p.nota { max-width: none; font-size: 12.5px; font-style: italic; }
   .grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (max-width: 560px) { .grade-2 { grid-template-columns: 1fr; } }
@@ -880,16 +917,17 @@ __VENTO__
 <section class="secao" id="dados">
   __VENTO__
   <h2>Dados</h2>
-  <div class="rolagem"><table>
-    <thead><tr><th>Dado</th><th>Fonte</th><th>Uso</th></tr></thead>
+  <div class="rolagem"><table class="tabela-dados">
+    <thead><tr><th>Dado</th><th>Fonte</th><th>Formato e resolução</th><th>Uso</th></tr></thead>
     <tbody>
-      <tr><td>Sentinel-2 L2A, reflectância de superfície, cenas de __ANO__</td><td>ESA/Copernicus, via Google Earth Engine</td><td>Índices espectrais e variáveis do modelo</td></tr>
-      <tr><td>Cloud Score+</td><td>Google, via Earth Engine</td><td>Máscara de nuvens</td></tr>
-      <tr><td>Limite da ottobacia 682636</td><td>ANA – Base Hidrográfica Ottocodificada</td><td>Recorte da área de estudo</td></tr>
-      <tr><td>MapBiomas 10 m, Coleção 4</td><td>MapBiomas</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
-      <tr><td>Mapeamento de areais do RS (2020)</td><td>SEMA-RS</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
-      <tr><td>Malhas territoriais do Brasil, do RS e dos municípios</td><td>IBGE</td><td>Referência no mapa</td></tr>
-      <tr><td>Amostras rotuladas (polígonos)</td><td>Interpretação visual neste projeto</td><td>Treino e teste</td></tr>
+      <tr><td>Sentinel-2 L2A, reflectância de superfície, __CENAS_S2__</td><td><a href="https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR_HARMONIZED">ESA/Copernicus, via Google Earth Engine</a></td><td>Imagem multiespectral, 10 m (visível e infravermelho próximo) e 20 m (infravermelho de ondas curtas)</td><td>Índices espectrais e variáveis do modelo</td></tr>
+      <tr><td>Cloud Score+</td><td><a href="https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_CLOUD_SCORE_PLUS_V1_S2_HARMONIZED">Google, via Earth Engine</a></td><td>Imagem de qualidade por pixel, 10 m</td><td>Máscara de nuvens</td></tr>
+      <tr><td>Imagens de alta resolução</td><td><a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9">Esri World Imagery</a> / <a href="https://earth.google.com/">Google Earth</a></td><td>Imagem, menos de 1 m</td><td>Interpretação visual das amostras</td></tr>
+      <tr><td>Limite da ottobacia 682636</td><td><a href="https://metadados.snirh.gov.br/geonetwork/srv/por/catalog.search">ANA – Base Hidrográfica Ottocodificada</a></td><td>Vetor (polígono)</td><td>Recorte da área de estudo</td></tr>
+      <tr><td>MapBiomas 10 m, Coleção 4</td><td><a href="https://brasil.mapbiomas.org/">MapBiomas</a></td><td>Mapa de cobertura e uso, 10 m</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
+      <tr><td>Mapeamento de areais do RS (2020)</td><td><a href="https://www.sema.rs.gov.br/">SEMA-RS</a></td><td>Vetor (polígonos)</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
+      <tr><td>Malhas territoriais do Brasil, do RS e dos municípios</td><td><a href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html">IBGE</a></td><td>Vetor (polígonos)</td><td>Referência no mapa</td></tr>
+      <tr><td>__AMOSTRAS_DADO__</td><td>__AMOSTRAS_FONTE__</td><td>Vetor (polígonos), GeoJSON e shapefile</td><td>Treino e teste</td></tr>
     </tbody>
   </table></div>
   <p class="nota">Todos os dados de entrada são públicos. As amostras rotuladas estão publicadas no GitHub sob licença
@@ -1292,6 +1330,7 @@ document.getElementById("ir-mancha").addEventListener("click", () => {
 
 // Minigráfico das medianas bimestrais de uma mancha de areal, com as curvas típicas de Lavoura e Campo
 const NOMES_INDICE = { ndvi: "NDVI", ndwi: "NDWI", bsi: "BSI" };
+const ABAS_BALAO = ["ndvi", "bsi"];   // o NDWI não entra no balão: nas manchas de areal ele quase não varia
 const EIXO_Y = { ndvi: "NDVI ↑ mais vegetação", ndwi: "NDWI ↑ mais água", bsi: "BSI ↑ mais solo exposto" };
 const BIMESTRES_CURTOS = ["jan–fev", "mar–abr", "mai–jun", "jul–ago", "set–out", "nov–dez"];
 const COMO_LER = {
@@ -1329,7 +1368,7 @@ function miniGrafico(serie, nome) {
 }
 const pct = (v) => `${Math.round(100 * v)}%`;
 function conteudoPopup(props, nome) {
-  nome = nome || (NOMES_INDICE[indiceAtual] ? indiceAtual : "ndvi");
+  nome = nome || (ABAS_BALAO.includes(indiceAtual) ? indiceAtual : "ndvi");
   let corpo = `<b class="titulo-mancha">Mancha de areal · ${fmt(props.area_ha)} ha</b>`;
   const numeros = [];
   if (props.f !== undefined && props.f !== null) {
@@ -1341,7 +1380,7 @@ function conteudoPopup(props, nome) {
   if (numeros.length) corpo += `<p class="mini-numeros">${numeros.map((n) => `<span>${n}</span>`).join("")}</p>`;
   const serie = typeof props.s === "string" ? JSON.parse(props.s) : props.s;
   if (serie) {
-    corpo += `<div class="mini-abas">${Object.keys(NOMES_INDICE).map((k) =>
+    corpo += `<div class="mini-abas">${ABAS_BALAO.map((k) =>
       `<button type="button" class="mini-aba" data-ind="${k}" aria-pressed="${k === nome}">${NOMES_INDICE[k]}</button>`).join("")}</div>`
       + miniGrafico(serie, nome)
       + `<p class="como-ler">${COMO_LER[nome]}</p>`

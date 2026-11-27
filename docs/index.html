@@ -178,6 +178,17 @@
   .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 20px; }
   .cartao-texto h3:first-child { margin-top: 0; }
   .nota { font-size: 13px; color: var(--texto-suave); }
+  .detalhe-dado { display: block; font-size: 12.5px; color: var(--texto-suave); }
+  /* Celular: cada dado vira um bloco, com o nome da coluna antes de cada valor */
+  @media (max-width: 600px) {
+    .tabela-dados thead { display: none; }
+    .tabela-dados tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--duna); }
+    .tabela-dados td { display: block; border: none; padding: 2px 0; }
+    .tabela-dados td:first-child { font-weight: 600; }
+    .tabela-dados td:nth-child(2)::before { content: "Fonte: "; font-weight: 600; }
+    .tabela-dados td:nth-child(3)::before { content: "Formato e resolução: "; font-weight: 600; }
+    .tabela-dados td:nth-child(4)::before { content: "Uso: "; font-weight: 600; }
+  }
   .secao > p.dica, .secao > p.nota { max-width: none; font-size: 12.5px; font-style: italic; }
   .grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (max-width: 560px) { .grade-2 { grid-template-columns: 1fr; } }
@@ -494,16 +505,17 @@
 <section class="secao" id="dados">
   <svg class="vento" viewBox="0 0 1200 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 Q120 3 240 12 T480 12 T720 12 T960 12 T1200 12"/></svg>
   <h2>Dados</h2>
-  <div class="rolagem"><table>
-    <thead><tr><th>Dado</th><th>Fonte</th><th>Uso</th></tr></thead>
+  <div class="rolagem"><table class="tabela-dados">
+    <thead><tr><th>Dado</th><th>Fonte</th><th>Formato e resolução</th><th>Uso</th></tr></thead>
     <tbody>
-      <tr><td>Sentinel-2 L2A, reflectância de superfície, cenas de 2025</td><td>ESA/Copernicus, via Google Earth Engine</td><td>Índices espectrais e variáveis do modelo</td></tr>
-      <tr><td>Cloud Score+</td><td>Google, via Earth Engine</td><td>Máscara de nuvens</td></tr>
-      <tr><td>Limite da ottobacia 682636</td><td>ANA – Base Hidrográfica Ottocodificada</td><td>Recorte da área de estudo</td></tr>
-      <tr><td>MapBiomas 10 m, Coleção 4</td><td>MapBiomas</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
-      <tr><td>Mapeamento de areais do RS (2020)</td><td>SEMA-RS</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
-      <tr><td>Malhas territoriais do Brasil, do RS e dos municípios</td><td>IBGE</td><td>Referência no mapa</td></tr>
-      <tr><td>Amostras rotuladas (polígonos)</td><td>Interpretação visual neste projeto</td><td>Treino e teste</td></tr>
+      <tr><td>Sentinel-2 L2A, reflectância de superfície, 87 cenas de 2025</td><td><a href="https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR_HARMONIZED">ESA/Copernicus, via Google Earth Engine</a></td><td>Imagem multiespectral, 10 m (visível e infravermelho próximo) e 20 m (infravermelho de ondas curtas)</td><td>Índices espectrais e variáveis do modelo</td></tr>
+      <tr><td>Cloud Score+</td><td><a href="https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_CLOUD_SCORE_PLUS_V1_S2_HARMONIZED">Google, via Earth Engine</a></td><td>Imagem de qualidade por pixel, 10 m</td><td>Máscara de nuvens</td></tr>
+      <tr><td>Imagens de alta resolução</td><td><a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9">Esri World Imagery</a> / <a href="https://earth.google.com/">Google Earth</a></td><td>Imagem, menos de 1 m</td><td>Interpretação visual das amostras</td></tr>
+      <tr><td>Limite da ottobacia 682636</td><td><a href="https://metadados.snirh.gov.br/geonetwork/srv/por/catalog.search">ANA – Base Hidrográfica Ottocodificada</a></td><td>Vetor (polígono)</td><td>Recorte da área de estudo</td></tr>
+      <tr><td>MapBiomas 10 m, Coleção 4</td><td><a href="https://brasil.mapbiomas.org/">MapBiomas</a></td><td>Mapa de cobertura e uso, 10 m</td><td>Apoio à amostragem, controle de qualidade e comparação</td></tr>
+      <tr><td>Mapeamento de areais do RS (2020)</td><td><a href="https://www.sema.rs.gov.br/">SEMA-RS</a></td><td>Vetor (polígonos)</td><td>Localização dos areais, controle de qualidade e comparação</td></tr>
+      <tr><td>Malhas territoriais do Brasil, do RS e dos municípios</td><td><a href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html">IBGE</a></td><td>Vetor (polígonos)</td><td>Referência no mapa</td></tr>
+      <tr><td>Amostras rotuladas: 1.623 polígonos<span class="detalhe-dado">Areal 176, Campo 380, Lavoura 302, Silvicultura 301, Água 70, Vegetação Nativa 300, Lavoura exposta 94</span></td><td>Interpretação visual neste projeto, publicada no GitHub (<a href="https://github.com/Franquinoschang/arenizacao-pampa/blob/main/data/raw/amostras_2025_revisado.geojson">amostras_2025_revisado.geojson</a> e <a href="https://github.com/Franquinoschang/arenizacao-pampa/tree/main/data/raw/Lavouras_correcao">lavouras.shp</a>)</td><td>Vetor (polígonos), GeoJSON e shapefile</td><td>Treino e teste</td></tr>
     </tbody>
   </table></div>
   <p class="nota">Todos os dados de entrada são públicos. As amostras rotuladas estão publicadas no GitHub sob licença
@@ -914,6 +926,7 @@ document.getElementById("ir-mancha").addEventListener("click", () => {
 
 // Minigráfico das medianas bimestrais de uma mancha de areal, com as curvas típicas de Lavoura e Campo
 const NOMES_INDICE = { ndvi: "NDVI", ndwi: "NDWI", bsi: "BSI" };
+const ABAS_BALAO = ["ndvi", "bsi"];   // o NDWI não entra no balão: nas manchas de areal ele quase não varia
 const EIXO_Y = { ndvi: "NDVI ↑ mais vegetação", ndwi: "NDWI ↑ mais água", bsi: "BSI ↑ mais solo exposto" };
 const BIMESTRES_CURTOS = ["jan–fev", "mar–abr", "mai–jun", "jul–ago", "set–out", "nov–dez"];
 const COMO_LER = {
@@ -951,7 +964,7 @@ function miniGrafico(serie, nome) {
 }
 const pct = (v) => `${Math.round(100 * v)}%`;
 function conteudoPopup(props, nome) {
-  nome = nome || (NOMES_INDICE[indiceAtual] ? indiceAtual : "ndvi");
+  nome = nome || (ABAS_BALAO.includes(indiceAtual) ? indiceAtual : "ndvi");
   let corpo = `<b class="titulo-mancha">Mancha de areal · ${fmt(props.area_ha)} ha</b>`;
   const numeros = [];
   if (props.f !== undefined && props.f !== null) {
@@ -963,7 +976,7 @@ function conteudoPopup(props, nome) {
   if (numeros.length) corpo += `<p class="mini-numeros">${numeros.map((n) => `<span>${n}</span>`).join("")}</p>`;
   const serie = typeof props.s === "string" ? JSON.parse(props.s) : props.s;
   if (serie) {
-    corpo += `<div class="mini-abas">${Object.keys(NOMES_INDICE).map((k) =>
+    corpo += `<div class="mini-abas">${ABAS_BALAO.map((k) =>
       `<button type="button" class="mini-aba" data-ind="${k}" aria-pressed="${k === nome}">${NOMES_INDICE[k]}</button>`).join("")}</div>`
       + miniGrafico(serie, nome)
       + `<p class="como-ler">${COMO_LER[nome]}</p>`
