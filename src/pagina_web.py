@@ -428,7 +428,7 @@ MODELO = r"""<!doctype html>
   #mapa { position: absolute; inset: 0; }
   .coluna-texto { min-width: 0; }
   @media (min-width: 900px) {
-    .story { display: grid; grid-template-columns: minmax(0, 58fr) minmax(0, 42fr); align-items: start; }
+    .story { display: grid; grid-template-columns: minmax(0, 52fr) minmax(0, 48fr); align-items: start; }
     .coluna-mapa { height: 100vh; z-index: 1; }
     .botao-expandir { display: none; }
   }
@@ -463,6 +463,7 @@ MODELO = r"""<!doctype html>
   .painel summary { font: 600 14px var(--titulo); cursor: pointer; padding: 4px 0; }
   .controles { left: 12px; top: 12px; }
   .conteudo-controles { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+  .conteudo-controles .check-ref { display: flex; flex-direction: row; align-items: center; gap: 6px; }
   .controles label { display: flex; flex-direction: column; gap: 4px; }
   .controles input[type=range] { accent-color: var(--roxo); width: 210px; }
   .controles .seletor { width: 210px; font-size: 13px; }
@@ -529,6 +530,11 @@ MODELO = r"""<!doctype html>
   .cartao-texto { background: var(--superficie); border-radius: 14px; box-shadow: var(--sombra); padding: 16px 20px; }
   .cartao-texto h3:first-child { margin-top: 0; }
   .nota { font-size: 13px; color: var(--texto-suave); }
+  .secao > p.dica, .secao > p.nota { max-width: none; font-size: 12.5px; font-style: italic; }
+  .grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 560px) { .grade-2 { grid-template-columns: 1fr; } }
+  .lista-ods { margin: 0; padding-left: 18px; }
+  .lista-ods li { margin: 4px 0; }
   figure { margin: 16px 0; }
   figure img { width: 100%; border-radius: 14px; }
   figcaption { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
@@ -675,6 +681,7 @@ MODELO = r"""<!doctype html>
           <input type="range" id="periodo" min="0" max="0" value="0" aria-label="Período da imagem Sentinel-2">
         </div>
       </div>
+      <label class="check-ref"><input type="checkbox" id="ref-limites" checked> Limites do RS e dos estados (IBGE)</label>
       <label>Opacidade das classes<input type="range" id="opacidade" min="0" max="100" value="75"></label>
       <label>Comparar lado a lado com<select class="seletor" id="comparar-com">__OPCOES_COMPARAR__</select></label>
       </div>
@@ -753,9 +760,12 @@ __VENTO__
   <div class="grade">
     <div class="cartao-texto">
       <h3>Objetivos de Desenvolvimento Sustentável</h3>
-      <p><b>ODS 15 – Vida Terrestre</b>, meta 15.3: saber onde estão os areais é o primeiro passo para priorizar
-      manejo e recuperação. <b>ODS 2</b>: a arenização reduz a área útil para pecuária e lavoura.
-      <b>ODS 13</b>: o inventário é a linha de base para acompanhar o efeito de chuvas intensas e do vento.</p>
+      <ul class="lista-ods">
+        <li><b>ODS 15 – Vida Terrestre</b>, meta 15.3: saber onde estão os areais é o primeiro passo para priorizar
+        manejo e recuperação.</li>
+        <li><b>ODS 2</b>: a arenização reduz a área útil para pecuária e lavoura.</li>
+        <li><b>ODS 13</b>: o inventário é a linha de base para acompanhar o efeito de chuvas intensas e do vento.</li>
+      </ul>
     </div>
     <div class="cartao-texto">
       <h3>Produtos</h3>
@@ -857,7 +867,7 @@ __VENTO__
   </ol>
 
   <h3>Como ler os índices</h3>
-  <div class="grade">__CARTOES_INDICES__</div>
+  <div class="grade grade-2">__CARTOES_INDICES__</div>
   <h4>Valores típicos nas amostras</h4>
   <div class="rolagem">__TABELA_TIPICOS__</div>
   <p class="nota">Mediana de cada classe nos pontos de amostra de __ANO__. A Lavoura exposta é uma subclasse do treino,
@@ -1029,7 +1039,7 @@ const limites = [[__SUL__, __OESTE__], [__NORTE__, __LESTE__]];
 const mapa = L.map("mapa", { zoomControl: false, scrollWheelZoom: false }).fitBounds(limites);
 L.control.zoom({ position: "topright" }).addTo(mapa);
 mapa.on("focus click", () => mapa.scrollWheelZoom.enable());
-[["fundo", 250], ["mapbiomas", 410], ["classes", 420], ["areal", 430], ["limite", 440]].forEach(([nome, z]) => {
+[["fundo", 250], ["mapbiomas", 410], ["classes", 420], ["areal", 430], ["referencia", 435], ["limite", 440]].forEach(([nome, z]) => {
   mapa.createPane(nome).style.zIndex = z;
 });
 
@@ -1157,6 +1167,18 @@ const lerGeoJSON = (arquivo, camada) => fetch(arquivo)
   .then((d) => camada.addData(d))
   .catch((e) => console.warn(`Não foi possível carregar ${arquivo} (${e}). Abra a página por um servidor (http), não pelo arquivo.`));
 lerGeoJSON("bacia.geojson", bacia);
+// Referência regional: limites estaduais do Brasil e o contorno do RS (malhas do IBGE, arquivos fixos em docs/)
+const limitesRef = L.layerGroup([
+  L.geoJSON(null, { pane: "referencia", interactive: false, attribution: "Limites: IBGE",
+    style: { color: "#F2F2F2", weight: 1, opacity: 0.75, dashArray: "4 3", fill: false } }),
+  L.geoJSON(null, { pane: "referencia", interactive: false, style: { color: "#FFD166", weight: 2.5, opacity: 0.95, fill: false } }),
+]).addTo(mapa);
+const [ufsBrasil, contornoRS] = limitesRef.getLayers();
+lerGeoJSON("ufs_brasil.geojson", ufsBrasil);
+lerGeoJSON("rs.geojson", contornoRS);
+document.getElementById("ref-limites").addEventListener("change", (e) => {
+  if (e.target.checked) limitesRef.addTo(mapa); else limitesRef.remove();
+});
 lerGeoJSON("areais___ANO__.geojson", contornos);
 
 function atualizarContornos() {
